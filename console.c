@@ -77,7 +77,7 @@ void update() {
         // Use touch data as needed
         // For example:
         // printf("Touch[%d]: X=%d, Y=%d, Generation=%d\n", i, x, y, generation);
-        if (x != 0 && y != 0) {
+        if (x != 0 && y != 0 && generation) {
             rect(x, y,BUTTON_SIZE,BUTTON_SIZE, btn_color);
 
         }

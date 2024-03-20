@@ -32,32 +32,68 @@ const TOUCH_RINGBUFFER_ADDR = 0x20;
 const TOUCHES_COUNT = 10;
 const TOUCH_STRUCT_SIZE = 6; // 2 bytes for X, 2 bytes for Y, 2 bytes for generation
 
-export function bind_input_handlers(awsm_console) {
+// Initialize the ring buffer for touches
+function update_touch_ringbuffer(awsm_console) {
     let memory = awsm_console.memory;
-    
-    // Initialize the ring buffer for touches
     let touchRingBuffer = new Uint8Array(memory.buffer, TOUCH_RINGBUFFER_ADDR, TOUCHES_COUNT * TOUCH_STRUCT_SIZE);
-    let nextTouchIndex = 0;
-    let generation = 0;
-    let mousedown = false;
+    touchRingBuffer.fill(0);
+    let idx = 0;
+    for (const [_, value] of awsm_console.activeTouches.entries()) {
+        // Store touch information in the ring buffer
+        let [screenX, screenY, generation] = value;
+        const touchIndex = idx * TOUCH_STRUCT_SIZE;
+        touchRingBuffer[touchIndex + 1] = (screenX >> 8) & 0xff;
+        touchRingBuffer[touchIndex + 0] = screenX;
+        touchRingBuffer[touchIndex + 3] = (screenY >> 8) & 0xff;
+        touchRingBuffer[touchIndex + 2] = screenY;
+        touchRingBuffer[touchIndex + 5] = (generation >> 8) & 0xff;
+        touchRingBuffer[touchIndex + 4] = generation;
 
-    function handleTouchEvent(event) {
+        // nextTouchIndex = (nextTouchIndex + 1) % TOUCHES_COUNT;
+        idx += 1;
+    }
+
+    awsm_console.generation += 1;
+    
+}
+
+function bind_input_handlers(awsm_console) {
+    
+    
+    let mousedown = false;
+    awsm_console.activeTouches = new Map();
+    awsm_console.generation = 0;
+
+    function handleTouchEvent(event, removing) {
         event.preventDefault();
     
         const touches = event.changedTouches;
         for (let i = 0; i < touches.length; i++) {
             const touch = touches[i];
-            addTouch(touch.clientX, touch.clientY);
+            
+            addTouch(touch.identifier, removing, touch.clientX, touch.clientY);
         }
     }
     
-    function handleMouseEvent(event) {
+    function handleMouseEvent(event, removing) {
         event.preventDefault();
     
-        addTouch(event.clientX, event.clientY);
+        addTouch(-1, removing, event.clientX, event.clientY);
     }
     
-    function addTouch(x, y) {
+    function addTouch(id, removing, x, y) {
+        
+        if (removing) {
+            // console.log("removed")
+            awsm_console.activeTouches.delete(id);
+            return;
+        }
+
+        // existing_event = activeTouches.get(id)
+        // if (existing_event === undefined) {
+
+        // }
+        
 
         const canvas = document.getElementById('screen');
         const rect = canvas.getBoundingClientRect();
@@ -69,40 +105,35 @@ export function bind_input_handlers(awsm_console) {
         const screenX = Math.floor((x - rect.left) * scaleX);
         const screenY = Math.floor((y - rect.top) * scaleY);
     
-        console.log(screenX, screenY)
-
-
-        // Store touch information in the ring buffer
-        const touchIndex = nextTouchIndex * TOUCH_STRUCT_SIZE;
-        touchRingBuffer[touchIndex] = Math.floor(screenX);
-        touchRingBuffer[touchIndex + 2] = Math.floor(screenY);
-        touchRingBuffer[touchIndex + 4] = generation;
-    
-        nextTouchIndex = (nextTouchIndex + 1) % TOUCHES_COUNT;
-        if (nextTouchIndex === 0) {
-            // Increment generation when the ring buffer wraps around
-            generation++;
+        if (screenX < 0 || screenX >= canvas.width || screenY < 0 || screenY >= canvas.height) {
+            awsm_console.activeTouches.delete(id);
+            return;
         }
+
+        // console.log(screenX, screenY)
+        
+        awsm_console.activeTouches.set(id, [screenX, screenY, awsm_console.generation])
+
+
     }
 
-    // Clear the touch buffer on touch end
-    function clearTouchBuffer() {
-        // touchRingBuffer.fill(0);
-    }
+    const touch_update = (e) => {handleTouchEvent(e, false)}
+    const touch_delete = (e) => {handleTouchEvent(e, true)}
 
     // Attach touch event listeners
-    window.addEventListener('touchstart', handleTouchEvent, { passive: false });
-    window.addEventListener('touchmove', handleTouchEvent, { passive: false });
-    window.addEventListener('touchend', clearTouchBuffer, { passive: false });
-    window.addEventListener('touchcancel', clearTouchBuffer, { passive: false });
+    window.addEventListener('touchstart', touch_update, { passive: false });
+    window.addEventListener('touchmove', touch_update, { passive: false });
+    window.addEventListener('touchend', touch_delete, { passive: false });
+    window.addEventListener('touchcancel', touch_delete, { passive: false });
 
-    window.addEventListener('mousemove', (e) => {if(mousedown) {handleMouseEvent(e);}}, { passive: false });
-    window.addEventListener('mousedown', (e) => {mousedown = true; handleMouseEvent(e);}, { passive: false });
-    window.addEventListener('mouseup', () => {mousedown = false; clearTouchBuffer();}, { passive: false });
+    window.addEventListener('mousemove', (e) => {if(mousedown) {handleMouseEvent(e, false);}}, { passive: false });
+    window.addEventListener('mousedown', (e) => {mousedown = true; handleMouseEvent(e, false);}, { passive: false });
+    window.addEventListener('mouseup', (e) => {mousedown = false; handleMouseEvent(e, true);}, { passive: false });
 }
 
 // Define our virtual console
 export function configure(awsm_console) {
+
     let memory = awsm_console.memory;
 
     const configData = new Uint16Array(memory.buffer, CONFIG_ADDR, 4);
@@ -110,12 +141,6 @@ export function configure(awsm_console) {
     awsm_console.height = configData[1];
 
     const bufferData = new Uint8Array(memory.buffer, FRAMEBUFFER_ADDR, awsm_console.width * awsm_console.height * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
-
-
-
-    // Initialize memory addresses
-    // consoleMemory = new WebAssembly.Memory({ initial: 256 });
-    // screenBuffer = new Uint8Array(consoleMemory.buffer, 0, FRAMEBUFFER_BYPP * WIDTH * HEIGHT);
 
     // Create WebGL context
     const canvas = document.getElementById('screen');
@@ -181,9 +206,15 @@ export function configure(awsm_console) {
     // Set resolution uniform
     const resolutionUniformLocation = gl.getUniformLocation(program, 'u_resolution');
     gl.uniform2f(resolutionUniformLocation, awsm_console.width, awsm_console.height);
+
+
+    bind_input_handlers(awsm_console);
 }
 
 export function update(awsm_console) {
+
+    update_touch_ringbuffer(awsm_console);
+
     let memory = awsm_console.memory;
     var thisFrameTime = (thisLoop=new Date) - lastLoop;
     frameTime+= (thisFrameTime - frameTime) / filterStrength;

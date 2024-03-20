@@ -5,13 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=0">
     <title>Virtual Console</title>
     <script type="module">
-        import init, {configure, update, bind_input_handlers} from './console.js';
+        import init, {configure, update} from './console.js';
 
         async function run() {
             const awsm_console = await init();
             awsm_console._configure();
             configure(awsm_console);
-            bind_input_handlers(awsm_console);
             
             setInterval(() => {
                 awsm_console._update();
