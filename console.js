@@ -28,6 +28,76 @@ var frameTime = 0, lastLoop = new Date, thisLoop;
 const FRAMEBUFFER_BYPP = 4;
 const FRAMEBUFFER_ADDR = 0x100;
 const CONFIG_ADDR = 0x10;
+const TOUCH_RINGBUFFER_ADDR = 0x20;
+const TOUCHES_COUNT = 10;
+const TOUCH_STRUCT_SIZE = 6; // 2 bytes for X, 2 bytes for Y, 2 bytes for generation
+
+export function bind_input_handlers(awsm_console) {
+    let memory = awsm_console.memory;
+    
+    // Initialize the ring buffer for touches
+    let touchRingBuffer = new Uint16Array(memory.buffer, TOUCH_RINGBUFFER_ADDR, TOUCHES_COUNT * TOUCH_STRUCT_SIZE);
+    let nextTouchIndex = 0;
+    let generation = 0;
+
+    function handleTouchEvent(event) {
+        event.preventDefault();
+    
+        const touches = event.changedTouches;
+        for (let i = 0; i < touches.length; i++) {
+            const touch = touches[i];
+            addTouch(touch.clientX, touch.clientY);
+        }
+    }
+    
+    function handleMouseEvent(event) {
+        event.preventDefault();
+    
+        addTouch(event.clientX, event.clientY);
+    }
+    
+    function addTouch(x, y) {
+        console.log(x, y)
+
+        const canvas = document.getElementById('screen');
+        const rect = canvas.getBoundingClientRect();
+    
+        // Calculate screen coordinates based on canvas size and client coordinates
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        
+        const screenX = Math.floor((x - rect.left) * scaleX);
+        const screenY = Math.floor((y - rect.top) * scaleY);
+    
+
+        // Store touch information in the ring buffer
+        const touchIndex = nextTouchIndex * TOUCH_STRUCT_SIZE;
+        touchRingBuffer[touchIndex] = Math.floor(screenX);
+        touchRingBuffer[touchIndex + 1] = Math.floor(screenY);
+        touchRingBuffer[touchIndex + 2] = generation;
+    
+        nextTouchIndex = (nextTouchIndex + 1) % TOUCHES_COUNT;
+        if (nextTouchIndex === 0) {
+            // Increment generation when the ring buffer wraps around
+            generation++;
+        }
+    }
+
+    // Clear the touch buffer on touch end
+    function clearTouchBuffer() {
+        // touchRingBuffer.fill(0);
+    }
+
+    // Attach touch event listeners
+    window.addEventListener('touchstart', handleTouchEvent, { passive: false });
+    window.addEventListener('touchmove', handleTouchEvent, { passive: false });
+    window.addEventListener('touchend', clearTouchBuffer, { passive: false });
+    window.addEventListener('touchcancel', clearTouchBuffer, { passive: false });
+
+    window.addEventListener('mousemove', handleMouseEvent, { passive: false });
+    window.addEventListener('mousedown', handleMouseEvent, { passive: false });
+    window.addEventListener('mouseup', clearTouchBuffer, { passive: false });
+}
 
 // Define our virtual console
 export function configure(awsm_console) {
@@ -37,8 +107,7 @@ export function configure(awsm_console) {
     awsm_console.width = configData[0];
     awsm_console.height = configData[1];
 
-    const bufferPtr = FRAMEBUFFER_ADDR;
-    const bufferData = new Uint8Array(memory.buffer, bufferPtr, awsm_console.width * awsm_console.height * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
+    const bufferData = new Uint8Array(memory.buffer, FRAMEBUFFER_ADDR, awsm_console.width * awsm_console.height * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
 
 
 
@@ -104,6 +173,7 @@ export function configure(awsm_console) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.uniform1i(gl.getUniformLocation(program, 'u_texture'), 0);
 
     // Set resolution uniform
@@ -120,8 +190,7 @@ export function update(awsm_console) {
     // console.log(memory) 
     // Your game logic here
     // For now, let's just fill the screen buffer with random colors
-    const bufferPtr = 0;
-    const bufferData = new Uint8Array(memory.buffer, bufferPtr, awsm_console.width * awsm_console.height * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
+    const bufferData = new Uint8Array(memory.buffer, FRAMEBUFFER_ADDR, awsm_console.width * awsm_console.height * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
     // console.log(bufferData)
     // Update the texture with the screen buffer data
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, awsm_console.width, awsm_console.height, gl.RGBA, gl.UNSIGNED_BYTE, bufferData);

@@ -4,6 +4,17 @@
 #define FRAMEBUFFER_BYPP 4
 #define FRAMEBUFFER_ADDR 0x100
 #define CONFIG_ADDR 0x10
+#define TOUCH_RINGBUFFER_ADDR 0x20
+
+typedef struct {
+    uint16_t x;
+    uint16_t y;
+    uint16_t generation;
+} Touch;
+
+Touch* touch_buffer;
+int touchBufferSize = 10;
+
 
 #define SCREEN_WIDTH 160
 #define SCREEN_HEIGHT 256
@@ -13,6 +24,20 @@ uint8_t* screen_buffer;
 uint16_t* config_buffer;
 
 uint32_t* timer;
+
+const uint8_t btn_color[4] = {0, 0, 0, 255};
+
+void rect(const uint16_t sx, const uint16_t sy, const uint16_t w, const uint16_t h, const uint8_t color[4]) {
+    for (int i = sy; i < sy+h; i++) {
+        for(int j = sx; j < sx + w; j++) {
+            screen_buffer[(i*SCREEN_WIDTH+j) * 4] = color[0]; 
+            screen_buffer[(i*SCREEN_WIDTH+j) * 4 + 1] = color[1]; 
+            screen_buffer[(i*SCREEN_WIDTH+j) * 4 + 2] = color[2]; 
+            screen_buffer[(i*SCREEN_WIDTH+j) * 4 + 3] = color[3]; 
+        }
+    }
+}
+
 void configure() {
     // Set the screen buffer address
     screen_buffer = (uint8_t*)FRAMEBUFFER_ADDR;  // Assuming the screen buffer starts at memory address 0
@@ -21,7 +46,12 @@ void configure() {
 
     config_buffer[0] = SCREEN_WIDTH;
     config_buffer[1] = SCREEN_HEIGHT;
+
+    touch_buffer = (Touch*)TOUCH_RINGBUFFER_ADDR;
 }
+
+#define BUTTON_BOTTOM_OFFSET 20
+#define BUTTON_SIZE 20
 
 void update() {
     timer[0] += 1;
@@ -33,4 +63,25 @@ void update() {
         screen_buffer[i * 4 + 2] = (i*5 + timer[0]/8) % 199; // B
         screen_buffer[i * 4 + 3] = (i*11 + timer[0]/22) % 256;    // A
     }
+    
+    // rect(15, SCREEN_HEIGHT - BUTTON_BOTTOM_OFFSET - BUTTON_SIZE,BUTTON_SIZE,BUTTON_SIZE, &btn_color[0]);
+    // rect(15, 15,BUTTON_SIZE,BUTTON_SIZE, btn_color);
+
+    // Access touch data from the buffer
+    for (int i = 0; i < touchBufferSize; i++) {
+        Touch touch = touch_buffer[i];
+        uint16_t x = touch.x;
+        uint16_t y = touch.y;
+        uint16_t generation = touch.generation;
+
+        // Use touch data as needed
+        // For example:
+        // printf("Touch[%d]: X=%d, Y=%d, Generation=%d\n", i, x, y, generation);
+        if (x != 0 && y != 0) {
+            rect(x, y,BUTTON_SIZE,BUTTON_SIZE, btn_color);
+
+        }
+
+    }
+    
 }
