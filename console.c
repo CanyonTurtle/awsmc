@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 uint8_t* screen_buffer;
-const int SCREEN_WIDTH = 256;
-const int SCREEN_HEIGHT = 256;
+const int SCREEN_WIDTH = 1024;
+const int SCREEN_HEIGHT = 1024;
 const int FRAMEBUFFER_BYPP = 4;
 uint32_t* timer;
 volatile uint8_t fb[SCREEN_WIDTH * SCREEN_HEIGHT * FRAMEBUFFER_BYPP];

@@ -21,9 +21,11 @@ const fragmentShaderSource = `
     }
 `;
 
+var filterStrength = 20;
+var frameTime = 0, lastLoop = new Date, thisLoop;
 
-const WIDTH = 128;
-const HEIGHT = 128;
+const WIDTH = 1024;
+const HEIGHT = 1024;
 const FRAMEBUFFER_BYPP = 4;
 
 // Define our virtual console
@@ -101,6 +103,11 @@ let Console = {
     },
 
     update: function(memory) {
+
+        var thisFrameTime = (thisLoop=new Date) - lastLoop;
+        frameTime+= (thisFrameTime - frameTime) / filterStrength;
+        lastLoop = thisLoop;
+
         // console.log(memory) 
         // Your game logic here
         // For now, let's just fill the screen buffer with random colors
@@ -137,3 +144,8 @@ export default async function init() {
     Console.memory = instance.exports.memory;
     return Console;
 }
+
+var fpsOut = document.getElementById('fpsOut');
+setInterval(function(){
+fpsOut.innerHTML = (1000/frameTime).toFixed(1) + " fps";
+},1000);

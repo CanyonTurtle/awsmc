@@ -21,6 +21,7 @@
 </head>
 <body>
     <canvas id="screen"></canvas>
+    <span id="fpsOut">fps</span>
     <style>
         #screen {
             width: 100vmin;
@@ -31,6 +32,14 @@
 
         body {
             margin: 0px;
+            overflow: hidden;
+        }
+
+        #fpsOut{
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
         }
     </style>
 </body>
