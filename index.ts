@@ -10,4 +10,4 @@ Bun.serve({
     return new Response(null, { status: 404 });
   },
 });
-console.log("Listening on 3000")
+console.log("Running development build at http://localhost:3000/index.html")

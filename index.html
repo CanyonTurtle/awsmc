@@ -2,37 +2,77 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=0">
     <title>Virtual Console</title>
     <script type="module">
-        import init from './console.js';
+        import init, {configure, update} from './console.js';
 
         async function run() {
-            const console = await init();
-            console.configure(console.memory);
-            console._configure();
+            const awsm_console = await init();
+            awsm_console._configure();
+            configure(awsm_console);
+            
             setInterval(() => {
-                console._update();
-                console.update(console.memory);
+                awsm_console._update();
+                update(awsm_console);
             }, 1000 / 60);
+            const canvas = document.getElementById('screen');
+
+            // Set the canvas internal width and height
+            const canvasWidth = awsm_console.width;
+            const canvasHeight = awsm_console.height;
+            // canvas.width = canvasWidth;
+            // canvas.height = canvasHeight; -->
+    
+            function resizeCanvas() {
+                console.log("resized");
+                // Get the current size of the canvas container
+                const containerWidth = canvas.parentNode.clientWidth;
+                const containerHeight = canvas.parentNode.clientHeight;
+    
+                // Calculate the scale for width and height
+                const scaleWidth = containerWidth / canvasWidth;
+                const scaleHeight = containerHeight / canvasHeight;
+    
+                // Determine the scale to fit the canvas while preserving aspect ratio
+                let scale = Math.min(scaleWidth, scaleHeight);
+                console.log(scale);
+                
+                // Calculate the new dimensions
+                const newWidth = Math.floor(canvasWidth * scale);
+                const newHeight = Math.floor(canvasHeight * scale);
+    
+                // Set the canvas size
+                canvas.style.width = newWidth + 'px';
+                canvas.style.height = newHeight + 'px';
+            }
+    
+            // Initial resize
+            resizeCanvas();
+    
+            // Handle window resize
+            window.addEventListener('resize', resizeCanvas);
         }
 
         run();
+
+
     </script>
 </head>
 <body>
-    <canvas id="screen"></canvas>
-    <span id="fpsOut">fps</span>
+    <div id="canvas-container">
+        <canvas id="screen"></canvas>
+        <span id="fpsOut">fps</span>
+    </div>
     <style>
         #screen {
-            width: 100vmin;
-            height: 100vmin;
-            image-rendering: pixelated;
-            
+            image-rendering: pixelated; 
         }
 
-        body {
-            margin: 0px;
-            overflow: hidden;
+        body, html{
+            margin: 0px;  
+            width: 100%;
+            height: 100%;       
         }
 
         #fpsOut{
@@ -40,6 +80,14 @@
             top: 10px;
             left: 10px;
             z-index: 10;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
     </style>
 </body>
