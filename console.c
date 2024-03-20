@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #define FRAMEBUFFER_BYPP 4
-#define FRAMEBUFFER_ADDR 0x100
+#define FRAMEBUFFER_ADDR 0x200
 #define CONFIG_ADDR 0x10
 #define TOUCH_RINGBUFFER_ADDR 0x20
 

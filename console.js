@@ -26,7 +26,7 @@ var frameTime = 0, lastLoop = new Date, thisLoop;
 
 
 const FRAMEBUFFER_BYPP = 4;
-const FRAMEBUFFER_ADDR = 0x100;
+const FRAMEBUFFER_ADDR = 0x200;
 const CONFIG_ADDR = 0x10;
 const TOUCH_RINGBUFFER_ADDR = 0x20;
 const TOUCHES_COUNT = 10;
@@ -36,9 +36,10 @@ export function bind_input_handlers(awsm_console) {
     let memory = awsm_console.memory;
     
     // Initialize the ring buffer for touches
-    let touchRingBuffer = new Uint16Array(memory.buffer, TOUCH_RINGBUFFER_ADDR, TOUCHES_COUNT * TOUCH_STRUCT_SIZE);
+    let touchRingBuffer = new Uint8Array(memory.buffer, TOUCH_RINGBUFFER_ADDR, TOUCHES_COUNT * TOUCH_STRUCT_SIZE);
     let nextTouchIndex = 0;
     let generation = 0;
+    let mousedown = false;
 
     function handleTouchEvent(event) {
         event.preventDefault();
@@ -57,7 +58,6 @@ export function bind_input_handlers(awsm_console) {
     }
     
     function addTouch(x, y) {
-        console.log(x, y)
 
         const canvas = document.getElementById('screen');
         const rect = canvas.getBoundingClientRect();
@@ -69,12 +69,14 @@ export function bind_input_handlers(awsm_console) {
         const screenX = Math.floor((x - rect.left) * scaleX);
         const screenY = Math.floor((y - rect.top) * scaleY);
     
+        console.log(screenX, screenY)
+
 
         // Store touch information in the ring buffer
         const touchIndex = nextTouchIndex * TOUCH_STRUCT_SIZE;
         touchRingBuffer[touchIndex] = Math.floor(screenX);
-        touchRingBuffer[touchIndex + 1] = Math.floor(screenY);
-        touchRingBuffer[touchIndex + 2] = generation;
+        touchRingBuffer[touchIndex + 2] = Math.floor(screenY);
+        touchRingBuffer[touchIndex + 4] = generation;
     
         nextTouchIndex = (nextTouchIndex + 1) % TOUCHES_COUNT;
         if (nextTouchIndex === 0) {
@@ -94,9 +96,9 @@ export function bind_input_handlers(awsm_console) {
     window.addEventListener('touchend', clearTouchBuffer, { passive: false });
     window.addEventListener('touchcancel', clearTouchBuffer, { passive: false });
 
-    window.addEventListener('mousemove', handleMouseEvent, { passive: false });
-    window.addEventListener('mousedown', handleMouseEvent, { passive: false });
-    window.addEventListener('mouseup', clearTouchBuffer, { passive: false });
+    window.addEventListener('mousemove', (e) => {if(mousedown) {handleMouseEvent(e);}}, { passive: false });
+    window.addEventListener('mousedown', (e) => {mousedown = true; handleMouseEvent(e);}, { passive: false });
+    window.addEventListener('mouseup', () => {mousedown = false; clearTouchBuffer();}, { passive: false });
 }
 
 // Define our virtual console
