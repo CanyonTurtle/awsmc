@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Virtual Console</title>
+    <script type="module">
+        import init from './console.js';
+
+        async function run() {
+            const console = await init();
+            console.configure(console.memory);
+            console._configure();
+            setInterval(() => {
+                console._update();
+                console.update(console.memory);
+            }, 1000 / 60);
+        }
+
+        run();
+    </script>
+</head>
+<body>
+    <canvas id="screen"></canvas>
+    <style>
+        #screen {
+            width: 100vmin;
+            height: 100vmin;
+            image-rendering: pixelated;
+            
+        }
+
+        body {
+            margin: 0px;
+        }
+    </style>
+</body>
+</html>
