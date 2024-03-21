@@ -307,10 +307,7 @@ export async function init() {
     return awsm_console;
 }
 
-var fpsOut = document.getElementById('fpsOut');
-setInterval(function(){
-fpsOut.innerHTML = (1000/frameTime).toFixed(1) + " fps";
-},1000);
+
 
 export default async function run() {
     const awsm_console = await init();
@@ -357,5 +354,9 @@ export default async function run() {
 
     // Handle window resize
     window.addEventListener('resize', resizeCanvas);
+
+    var fpsOut = document.getElementById('fpsOut');
+    setInterval(function(){
+        fpsOut.innerHTML = (1000/frameTime).toFixed(1) + " fps";
+    },1000);
 }
-run();
