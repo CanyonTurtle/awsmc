@@ -25,7 +25,7 @@
             // canvas.height = canvasHeight; -->
     
             function resizeCanvas() {
-                console.log("resized");
+                // console.log("resized");
                 // Get the current size of the canvas container
                 const containerWidth = canvas.parentNode.clientWidth;
                 const containerHeight = canvas.parentNode.clientHeight;
@@ -36,7 +36,7 @@
     
                 // Determine the scale to fit the canvas while preserving aspect ratio
                 let scale = Math.min(scaleWidth, scaleHeight);
-                console.log(scale);
+                // console.log(scale);
 
                 // Calculate the new dimensions
                 const newWidth = Math.floor(canvasWidth * scale);
@@ -72,7 +72,8 @@
         body, html{
             margin: 0px;  
             width: 100%;
-            height: 100%;       
+            height: 100%;    
+            background-color: white;   
         }
 
         #fpsOut{

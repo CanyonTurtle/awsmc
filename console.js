@@ -1,5 +1,3 @@
-let consoleMemory;
-let screenBuffer;
 let gl;
 
 // Vertex shader source
@@ -31,6 +29,31 @@ const CONFIG_ADDR = 0x10;
 const TOUCH_RINGBUFFER_ADDR = 0x20;
 const TOUCHES_COUNT = 10;
 const TOUCH_STRUCT_SIZE = 6; // 2 bytes for X, 2 bytes for Y, 2 bytes for generation
+
+export function requestFullscreen () {
+    if (document.fullscreenElement == null) {
+        function expandIframe () {
+            // Fullscreen failed, try to maximize our own iframe. We don't yet have a button to go
+            // back to minimized, but this at least makes games on wasm4.org playable on iPhone
+            const iframe = window.frameElement;
+            if (iframe) {
+                iframe.style.position = "fixed";
+                iframe.style.top = "0";
+                iframe.style.left = "0";
+                iframe.style.zIndex = "99999";
+                iframe.style.width = "100%";
+                iframe.style.height = "100%";
+            }
+        }
+
+        const promise = document.body.requestFullscreen && document.body.requestFullscreen({navigationUI: "hide"});
+        if (promise) {
+            promise.catch(expandIframe);
+        } else {
+            expandIframe();
+        }
+    }
+}
 
 // Initialize the ring buffer for touches
 function update_touch_ringbuffer(awsm_console) {
@@ -65,6 +88,7 @@ function bind_input_handlers(awsm_console) {
     awsm_console.generation = 0;
 
     function handleTouchEvent(event, removing) {
+        requestFullscreen();
         event.preventDefault();
     
         const touches = event.changedTouches;
