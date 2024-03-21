@@ -291,7 +291,7 @@ export async function init() {
         },
     };
 
-    const response = await fetch('console.wasm');
+    const response = await fetch('cart.wasm');
     const buffer = await response.arrayBuffer();
     const { instance } = await WebAssembly.instantiate(buffer, imports);
 
