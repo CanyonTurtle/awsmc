@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <math.h>
 
 #define FRAMEBUFFER_BYPP 4
 #define FRAMEBUFFER_ADDR 0x200
@@ -19,6 +20,8 @@ int touchBufferSize = 10;
 #define SCREEN_WIDTH 160
 #define SCREEN_HEIGHT 256
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
 
 uint8_t* screen_buffer;
 uint16_t* config_buffer;
@@ -27,15 +30,21 @@ uint32_t* timer;
 
 const uint8_t btn_color[4] = {0, 0, 0, 255};
 
-void rect(const uint16_t sx, const uint16_t sy, const uint16_t w, const uint16_t h, const uint8_t color[4]) {
-    for (int i = sy; i < sy+h; i++) {
-        for(int j = sx; j < sx + w; j++) {
+
+
+void rect_unchecked(uint16_t sx, const uint16_t sy, const uint16_t ex, const uint16_t ey, const uint8_t color[4]) {
+    for (int i = sy; i < ey; i++) {
+        for(int j = sx; j < ex; j++) {
             screen_buffer[(i*SCREEN_WIDTH+j) * 4] = color[0]; 
             screen_buffer[(i*SCREEN_WIDTH+j) * 4 + 1] = color[1]; 
             screen_buffer[(i*SCREEN_WIDTH+j) * 4 + 2] = color[2]; 
             screen_buffer[(i*SCREEN_WIDTH+j) * 4 + 3] = color[3]; 
         }
     }
+}
+
+void rect(const int16_t sx, const int16_t sy, const uint16_t w, const uint16_t h, const uint8_t color[4]) {
+    rect_unchecked(MAX(sx, 0), MAX(sy, 0), MIN(sx+w, SCREEN_WIDTH-1), MIN(sy+h, SCREEN_HEIGHT-1), color);
 }
 
 void configure() {
@@ -78,8 +87,7 @@ void update() {
         // For example:
         // printf("Touch[%d]: X=%d, Y=%d, Generation=%d\n", i, x, y, generation);
         if (x != 0 && y != 0 && generation) {
-            rect(x, y,BUTTON_SIZE,BUTTON_SIZE, btn_color);
-
+            rect(x - BUTTON_SIZE / 2, y - BUTTON_SIZE / 2,BUTTON_SIZE,BUTTON_SIZE, btn_color);
         }
 
     }
