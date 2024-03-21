@@ -283,7 +283,7 @@ export function update(awsm_console) {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 6);
 }
 
-export default async function init() {
+export async function init() {
     const memory = new WebAssembly.Memory({ initial: 256 });
     const imports = {
         env: {
@@ -311,3 +311,51 @@ var fpsOut = document.getElementById('fpsOut');
 setInterval(function(){
 fpsOut.innerHTML = (1000/frameTime).toFixed(1) + " fps";
 },1000);
+
+export default async function run() {
+    const awsm_console = await init();
+    awsm_console._configure();
+    configure(awsm_console);
+    
+    setInterval(() => {
+        awsm_console._update();
+        update(awsm_console);
+    }, 1000 / 60);
+    const canvas = document.getElementById('screen');
+
+    // Set the canvas internal width and height
+    const canvasWidth = awsm_console.width;
+    const canvasHeight = awsm_console.height;
+    // canvas.width = canvasWidth;
+    // canvas.height = canvasHeight; -->
+
+    function resizeCanvas() {
+        // console.log("resized");
+        // Get the current size of the canvas container
+        const containerWidth = canvas.parentNode.clientWidth;
+        const containerHeight = canvas.parentNode.clientHeight;
+
+        // Calculate the scale for width and height
+        const scaleWidth = containerWidth / canvasWidth;
+        const scaleHeight = containerHeight / canvasHeight;
+
+        // Determine the scale to fit the canvas while preserving aspect ratio
+        let scale = Math.min(scaleWidth, scaleHeight);
+        // console.log(scale);
+
+        // Calculate the new dimensions
+        const newWidth = Math.floor(canvasWidth * scale);
+        const newHeight = Math.floor(canvasHeight * scale);
+
+        // Set the canvas size
+        canvas.style.width = newWidth + 'px';
+        canvas.style.height = newHeight + 'px';
+    }
+
+    // Initial resize
+    resizeCanvas();
+
+    // Handle window resize
+    window.addEventListener('resize', resizeCanvas);
+}
+run();
