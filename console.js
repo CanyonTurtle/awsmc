@@ -80,8 +80,11 @@ function update_touch_ringbuffer(awsm_console) {
     
 }
 
+/**
+ * Binds touch and mouse input handlers to update the console's running list of active touches.
+ * @param {any} awsm_console
+ */
 function bind_input_handlers(awsm_console) {
-    
     
     let mousedown = false;
     awsm_console.activeTouches = new Map();
@@ -104,20 +107,20 @@ function bind_input_handlers(awsm_console) {
     
         addTouch(-1, removing, event.clientX, event.clientY);
     }
-    
+
+    /**
+     * Handle a touch event, either adding it or removing it from our actively-maintained list of touches.
+     * @param {number} id the touch ID
+     * @param {bool} removing if true, remove this ID. if false, add or modify.
+     * @param {any} x the client touch X position
+     * @param {any} y the client touch Y position.
+     */
     function addTouch(id, removing, x, y) {
         
         if (removing) {
-            // console.log("removed")
             awsm_console.activeTouches.delete(id);
             return;
-        }
-
-        // existing_event = activeTouches.get(id)
-        // if (existing_event === undefined) {
-
-        // }
-        
+        }   
 
         const canvas = document.getElementById('screen');
         const rect = canvas.getBoundingClientRect();
@@ -129,30 +132,50 @@ function bind_input_handlers(awsm_console) {
         const screenX = Math.floor((x - rect.left) * scaleX);
         const screenY = Math.floor((y - rect.top) * scaleY);
     
+        // If the touch events were oob, delete them.
         if (screenX < 0 || screenX >= canvas.width || screenY < 0 || screenY >= canvas.height) {
             awsm_console.activeTouches.delete(id);
             return;
         }
-
-        // console.log(screenX, screenY)
-        
+  
+        // This will either update existing touches or add new ones, which will preserve the ordering.
         awsm_console.activeTouches.set(id, [screenX, screenY, awsm_console.generation])
-
 
     }
 
     const touch_update = (e) => {handleTouchEvent(e, false)}
     const touch_delete = (e) => {handleTouchEvent(e, true)}
 
-    // Attach touch event listeners
-    window.addEventListener('touchstart', touch_update, { passive: false });
-    window.addEventListener('touchmove', touch_update, { passive: false });
-    window.addEventListener('touchend', touch_delete, { passive: false });
-    window.addEventListener('touchcancel', touch_delete, { passive: false });
+    const handle_mousemove = (e) => {if(mousedown) {handleMouseEvent(e, false);}};
+    const handle_mousedown = (e) => {mousedown = true; handleMouseEvent(e, false);};
+    const handle_mouseup = (e) => {mousedown = false; handleMouseEvent(e, true);};
 
-    window.addEventListener('mousemove', (e) => {if(mousedown) {handleMouseEvent(e, false);}}, { passive: false });
-    window.addEventListener('mousedown', (e) => {mousedown = true; handleMouseEvent(e, false);}, { passive: false });
-    window.addEventListener('mouseup', (e) => {mousedown = false; handleMouseEvent(e, true);}, { passive: false });
+    // Attach touch event listeners
+
+    const rebind_listener = (ltype, func)  => {
+        window.removeEventListener(ltype, func, {passive: false})
+        window.addEventListener(ltype, func, {passive: false})
+    };
+
+    for (const [ltype, func] of [
+        ['touchstart', touch_update],
+        ['touchmove', touch_update],
+        ['touchend', touch_delete],
+        ['touchcancel', touch_delete],
+        ['mousemove', handle_mousemove],
+        ['mousedown', handle_mousedown],
+        ['mouseup', handle_mouseup],
+    ]) {
+        rebind_listener(ltype, func);
+    }
+
+    // window.addEventListener('touchstart', touch_update, { passive: false });
+    // window.addEventListener('touchmove', touch_update, { passive: false });
+    // window.addEventListener('touchend', touch_delete, { passive: false });
+    // window.addEventListener('touchcancel', touch_delete, { passive: false });
+    // window.addEventListener('mousemove', handle_mousemove, { passive: false });
+    // window.addEventListener('mousedown', handle_mousedown, { passive: false });
+    // window.addEventListener('mouseup', handle_mouseup, { passive: false });
 }
 
 // Define our virtual console
