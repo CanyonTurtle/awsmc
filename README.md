@@ -22,11 +22,15 @@ Compile a wasm file to `docs/cart.wasm` and visit `index.html` (Any http server 
 To build the demo `cart.wasm` from the demo game `src/game.c`, first install emscripten, then run
 
 ```bash
-emcc src/game.c -o docs/cart.wasm -s EXPORTED_FUNCTIONS="['_configure', '_update']" -s STACK_SIZE=8mb --no-entry
+emcc src/game.c -o build/cart.wasm -s EXPORTED_FUNCTIONS="['_configure', '_update']" -s STACK_SIZE=8mb --no-entry
 ```
 
-Now that the game is built, use any static http server to serve up the `/docs` folder, and navigate to 
-`localhost_whatever:1234/index.html` to view the game.
+Now that the game is built, run as follows:
+```bash
+bun run build.ts
+```
+
+Now view index.html
 
 If you want to host your game, just publish the docs folder to your site and you've got a game!
 

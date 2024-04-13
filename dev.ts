@@ -1,4 +1,4 @@
-const BASE_PATH = "./";
+const BASE_PATH = "./docs";
 Bun.serve({
   port: 3000,
   async fetch(req) {

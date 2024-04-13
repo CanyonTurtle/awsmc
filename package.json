@@ -2,10 +2,13 @@
   "name": "awsmc",
   "module": "index.ts",
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "^1.0.12"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@types/webgl-ext": "^0.0.37"
+  }
 }
