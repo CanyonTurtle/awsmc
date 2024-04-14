@@ -1,4 +1,4 @@
-import {encode, decode} from "./src/z85.ts";
+import {encode, decode} from "./runtime/z85.ts";
 import html from 'bun-plugin-html';
 
 var codes: Map<string, string>;
@@ -15,7 +15,7 @@ async function do_build() {
   // const encoded = Buffer.from((<any>cartdata), 'binary').toString('base64')
   const encoded = encode(Buffer.from((<any>cartdata), 'binary'))
 
-  let ht = await Bun.file("./src/app.html").text();
+  let ht = await Bun.file("./runtime/app.html").text();
   let rewriter = new HTMLRewriter()
 
   // let codes_json = JSON.stringify(codes, (key, value) => (value instanceof Map ? [...value] : value));
@@ -26,12 +26,12 @@ async function do_build() {
       el.setAttribute("data-cartlen", cartdata.byteLength.toString())
     }
   })
-  await Bun.write("src/index.html", rewriter.transform(ht));
+  await Bun.write("runtime/index.html", rewriter.transform(ht));
 
   
   // usual build semantics
   await Bun.build({
-    entrypoints: ['./src/index.html'],
+    entrypoints: ['./runtime/index.html'],
     outdir: './docs',
     minify: true,
     plugins: [
