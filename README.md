@@ -17,9 +17,7 @@ But I also want this virtual console to work for anyone who:
 
 ## Create your own game
 
-Compile a wasm file to `docs/cart.wasm` and visit `index.html` (Any http server can be used to serve up the `/docs` folder). There is no build tooling provided, bring your own everything lol. Still working on ideas for how this will work.
-
-To build the demo `cart.wasm` from the demo game `src/game.c`, first install emscripten, then run
+Compile a wasm file to `build/cart.wasm`. For instance, build the demo `cart.wasm` from the demo game `src/game.c` by installing emscripten, then running
 
 ```bash
 emcc src/game.c -o build/cart.wasm -s EXPORTED_FUNCTIONS="['_configure', '_update']" -s STACK_SIZE=8mb --no-entry
@@ -30,7 +28,7 @@ Now that the game is built, run as follows:
 bun run build.ts
 ```
 
-Now view index.html
+Now view index.html.
 
 If you want to host your game, just publish the docs folder to your site and you've got a game!
 
