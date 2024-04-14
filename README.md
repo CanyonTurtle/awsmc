@@ -46,3 +46,17 @@ Now open `build/index.html`. You don't even have to "serve" the site - just open
 Just publish your HTML file to your site and you've got a game!
 
 [Acknowledgments here.](./acknowledgments.md)
+
+## How does customization occur?
+
+The web runtime expects a configure() function. This function can change specific memory locations to specify the location of the framebuffer, the size of memory, width/height of screen, etc...
+
+Right now that is done very loosely and is best-understood by reading `src/game.c` alongside `runtimes/console.ts`, but as I prod out the design I will make this more definite.
+
+## But what about...
+... Sound? Netplay? Language templates? PNG to source code helpers? And, all of the other amazing features of WASM-4? I mean, why wasn't this just a proper fork of WASM-4?
+
+Sound is planned, netplay is in conceptual stages. I want netplay to also be built in, but have a different design (explicitly-stored runback state instead of just gamepad stat, or idk maybe all the input would be passed around. Also
+not sure how I want to do discovery of peers, whether to have a lobby server, etc...). PNG to SRC is planned. Language templates is planned. 
+
+Honestly, maybe this would have worked as a WASM-4 fork. I guess I was eager to make my own for the sake of learning, and I thought building ontop of minimal dependencies + Bun would be forward-thinking. Plus there's the whole API-breaking configurable memory layout thing... so yah!

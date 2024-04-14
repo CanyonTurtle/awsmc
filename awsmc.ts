@@ -56,7 +56,7 @@ async function do_build() {
         type: "string",
       })
     }, async ({cart, output}) => {
-      await bundle(cart, output);
+      await bundle((<string>cart), (<string>output));
     })
     .help()
     .demandCommand()
