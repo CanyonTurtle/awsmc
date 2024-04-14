@@ -1,14 +1,13 @@
-import {encode, decode} from "./runtime/z85.ts";
+import {encode} from "./runtime/z85.ts";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 import html from 'bun-plugin-html';
 
-var codes: Map<string, string>;
-
-async function do_build() {
-
-
+async function bundle(cart: string, output: string) {
   // here we manually copy over the index with the game's source copied in
 
   let cartdata = await Bun.file("./build/cart.wasm", {type: "application/wasm"}).arrayBuffer();
+    
   // let codes = getCharCodesFromSource(cartdata);
   // let encoded_cart = encode(cartdata, codes);
 
@@ -28,7 +27,7 @@ async function do_build() {
   })
   await Bun.write("runtime/index.html", rewriter.transform(ht));
 
-  
+
   // usual build semantics
   await Bun.build({
     entrypoints: ['./runtime/index.html'],
@@ -40,6 +39,30 @@ async function do_build() {
       })
     ]
   })
+
+  console.log(`Bundled cartridge at ${cart} to ${output}.`)
+}
+
+async function do_build() {
+
+  const argv = yargs(hideBin(Bun.argv))
+  .command("bundle <cart> <output>", "Bundles a WASM game.", (yargs) => {
+      yargs.positional("cart", {
+        description: "Filepath to a .wasm file of your game.",
+        type: "string",
+      })
+      yargs.positional("output", {
+        description: "Filepath for the output bundled HTML game.",
+        type: "string",
+      })
+    }, async ({cart, output}) => {
+      await bundle(cart, output);
+    })
+    .help()
+    .demandCommand()
+    .parse()
+
+  
 }
 
 await do_build()

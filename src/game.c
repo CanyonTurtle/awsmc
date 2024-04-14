@@ -18,7 +18,7 @@ int touchBufferSize = 10;
 
 
 #define SCREEN_WIDTH 160
-#define SCREEN_HEIGHT 256
+#define SCREEN_HEIGHT 160
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))

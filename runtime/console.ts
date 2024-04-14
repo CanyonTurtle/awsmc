@@ -107,7 +107,7 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
     awsm_console.generation = 0;
 
     function handleTouchEvent(event: TouchEvent, removing: boolean) {
-        requestFullscreen();
+        
         event.preventDefault();
     
         const touches = event.changedTouches;
@@ -185,13 +185,10 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
         rebind_listener((<string>ltype), (<EventListener>func));
     }
 
-    // window.addEventListener('touchstart', touch_update, { passive: false });
-    // window.addEventListener('touchmove', touch_update, { passive: false });
-    // window.addEventListener('touchend', touch_delete, { passive: false });
-    // window.addEventListener('touchcancel', touch_delete, { passive: false });
-    // window.addEventListener('mousemove', handle_mousemove, { passive: false });
-    // window.addEventListener('mousedown', handle_mousedown, { passive: false });
-    // window.addEventListener('mouseup', handle_mouseup, { passive: false });
+    document.getElementById("fullscreen-btn")!.addEventListener("click", (e: Event) => {
+        e.preventDefault();
+        requestFullscreen();
+    });
 }
 
 // Define our virtual console

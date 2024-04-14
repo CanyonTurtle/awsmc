@@ -16,25 +16,33 @@ But I also want this virtual console to work for anyone who:
 - Who want to be able to do it all in their language of choice that compiles to Wasm.
 
 ## Create your own game
-
-Compile a wasm file to `build/cart.wasm`. For instance, build the demo `cart.wasm` from the demo game `src/game.c` by installing emscripten, then running
+First, install [Bun](https://bun.sh/).
+Next, install your programming language of choice that compiles to WASM.
+For instance, you can build the demo game at `src/game.c` by installing [Emscripten](https://emscripten.org/).
+Then:
 
 ```bash
+
+# Grab this game engine onto your computer
+git clone https://github.com/CanyonTurtle/awsmc.git
+
+# Enter the folder
+cd awsmc
+
+# Install web dependencies for bundling
+bun install
+
+# Compile the game to a WASM file
 emcc src/game.c -o build/cart.wasm -s EXPORTED_FUNCTIONS="['_configure', '_update']" -s STACK_SIZE=8mb --no-entry
+
+# Bundle the WASM file into a playable HTML file.
+bun run awsmc.ts bundle build/cart.wasm build/index.html
 ```
 
-Now that the game is built, run as follows:
-```bash
-bun run build.ts
-```
+Now open `build/index.html`. You don't even have to "serve" the site - just opening in a browser will do. If all goes well, you should see a playable game!
 
-Now view index.html.
+## Publish your game
 
-If you want to host your game, just publish the docs folder to your site and you've got a game!
-
-## Why is Bun in here?
-
-Eventually I am considering building out some tooling to bundle games, etc... but I haven't made up my mind.
-
+Just publish your HTML file to your site and you've got a game!
 
 [Acknowledgments here.](./acknowledgments.md)
