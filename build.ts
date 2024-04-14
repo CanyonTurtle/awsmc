@@ -1,14 +1,10 @@
 import {getCharCodesFromSource, encode, decode} from "./src/huffman.ts";
+import html from 'bun-plugin-html';
 
 var codes: Map<string, string>;
 
 async function do_build() {
 
-  // usual build semantics
-  await Bun.build({
-    entrypoints: ['./src/console.ts'],
-    outdir: './docs',
-  })
 
   // here we manually copy over the index with the game's source copied in
 
@@ -16,9 +12,9 @@ async function do_build() {
   // let codes = getCharCodesFromSource(cartdata);
   // let encoded_cart = encode(cartdata, codes);
 
-  const encoded = Buffer.from(cartdata, 'binary').toString('base64')
+  const encoded = Buffer.from((<any>cartdata), 'binary').toString('base64')
 
-  let ht = await Bun.file("./src/index.html").text();
+  let ht = await Bun.file("./src/app.html").text();
   let rewriter = new HTMLRewriter()
 
   // let codes_json = JSON.stringify(codes, (key, value) => (value instanceof Map ? [...value] : value));
@@ -28,7 +24,20 @@ async function do_build() {
       el.setAttribute("data-cart", encoded)
     }
   })
-  Bun.write("docs/index.html", rewriter.transform(ht))
+  await Bun.write("src/index.html", rewriter.transform(ht));
+
+  
+  // usual build semantics
+  await Bun.build({
+    entrypoints: ['./src/index.html'],
+    outdir: './docs',
+    minify: true,
+    plugins: [
+      html({
+        inline: true
+      })
+    ]
+  })
 }
 
 await do_build()

@@ -2,7 +2,8 @@
   "name": "awsmc",
   "module": "index.ts",
   "devDependencies": {
-    "@types/bun": "^1.0.12"
+    "@types/bun": "^1.0.12",
+    "bun-plugin-html": "^2.0.0"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

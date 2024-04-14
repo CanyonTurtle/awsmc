@@ -310,9 +310,9 @@ export async function init(): Promise<AwsmConsole> {
     };
 
     const encoded = document.getElementById("cartdata")!.getAttribute("data-cart")!;
-    console.log(encoded)
+    // console.log(encoded)
 
-    function asciiToBinary(str) {
+    function asciiToBinary(str: any) {
         if (typeof atob === 'function') {
             return atob(str)
         } else {
@@ -320,7 +320,7 @@ export async function init(): Promise<AwsmConsole> {
         }
     }
 
-    function decode(encoded) {
+    function decode(encoded: any) {
         var binaryString = asciiToBinary(encoded);
         var bytes = new Uint8Array(binaryString.length);
         for (var i = 0; i < binaryString.length; i++) {
