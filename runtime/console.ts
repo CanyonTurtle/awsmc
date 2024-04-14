@@ -168,9 +168,11 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
 
     // Attach touch event listeners
 
+    const screen_el = document.getElementById("screen")!;
+
     const rebind_listener = (ltype: string, func: EventListener)  => {
-        (<any>window).removeEventListener(ltype, func, {passive: false})
-        window.addEventListener(ltype, func, {passive: false})
+        screen_el.removeEventListener(ltype, func, {passive: false})
+        screen_el.addEventListener(ltype, func, {passive: false})
     };
 
     for (const [ltype, func] of [

@@ -4,14 +4,14 @@
   "devDependencies": {
     "@types/bun": "^1.0.12",
     "@types/yargs": "^17.0.32",
-    "bun-plugin-html": "^2.0.0",
-    "yargs": "^17.7.2"
+    "@types/webgl-ext": "^0.0.37"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
   },
   "type": "module",
   "dependencies": {
-    "@types/webgl-ext": "^0.0.37"
+    "bun-plugin-html": "^2.0.0",
+    "yargs": "^17.7.2"
   }
 }
