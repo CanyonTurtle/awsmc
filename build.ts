@@ -1,4 +1,4 @@
-import {getCharCodesFromSource, encode, decode} from "./src/huffman.ts";
+import {encode, decode} from "./src/z85.ts";
 import html from 'bun-plugin-html';
 
 var codes: Map<string, string>;
@@ -12,7 +12,8 @@ async function do_build() {
   // let codes = getCharCodesFromSource(cartdata);
   // let encoded_cart = encode(cartdata, codes);
 
-  const encoded = Buffer.from((<any>cartdata), 'binary').toString('base64')
+  // const encoded = Buffer.from((<any>cartdata), 'binary').toString('base64')
+  const encoded = encode(Buffer.from((<any>cartdata), 'binary'))
 
   let ht = await Bun.file("./src/app.html").text();
   let rewriter = new HTMLRewriter()
@@ -22,6 +23,7 @@ async function do_build() {
   rewriter.on("div#cartdata", {
     element(el) {
       el.setAttribute("data-cart", encoded)
+      el.setAttribute("data-cartlen", cartdata.byteLength.toString())
     }
   })
   await Bun.write("src/index.html", rewriter.transform(ht));

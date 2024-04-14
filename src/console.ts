@@ -1,5 +1,5 @@
 // import cart from "../build/cart.wasm"
-import {decode} from "./huffman.ts"
+import {decode} from "./z85.ts"
 
 let gl: WebGL2RenderingContext;
 
@@ -309,27 +309,33 @@ export async function init(): Promise<AwsmConsole> {
         },
     };
 
-    const encoded = document.getElementById("cartdata")!.getAttribute("data-cart")!;
+    const cartdata_el = document.getElementById("cartdata")!;
+    const encoded = cartdata_el.getAttribute("data-cart")!;
+    const encoded_len = Number(cartdata_el.getAttribute("data-cartlen")!)!;
+
     // console.log(encoded)
 
-    function asciiToBinary(str: any) {
-        if (typeof atob === 'function') {
-            return atob(str)
-        } else {
-            return new Buffer(str, 'base64').toString('binary');
-        }
-    }
+    // function asciiToBinary(str: any) {
+    //     if (typeof atob === 'function') {
+    //         return atob(str)
+    //     } else {
+    //         return new Buffer(str, 'base64').toString('binary');
+    //     }
+    // }
 
-    function decode(encoded: any) {
-        var binaryString = asciiToBinary(encoded);
-        var bytes = new Uint8Array(binaryString.length);
-        for (var i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-        }
-        return bytes.buffer;
-    }
+    // function decode(encoded: any) {
+    //     var binaryString = asciiToBinary(encoded);
+    //     var bytes = new Uint8Array(binaryString.length);
+    //     for (var i = 0; i < binaryString.length; i++) {
+    //         bytes[i] = binaryString.charCodeAt(i);
+    //     }
+    //     return bytes.buffer;
+    // }
 
-    const { instance } = await WebAssembly.instantiate(decode(encoded), imports);
+    const decoded_cart = new Uint8Array(encoded_len);
+    decode(encoded, decoded_cart)
+
+    const { instance } = await WebAssembly.instantiate(decoded_cart, imports);
 
     // Expose the configure and update functions
     let awsm_console = {
