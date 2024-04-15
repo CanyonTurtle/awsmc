@@ -6,7 +6,7 @@ import html from 'bun-plugin-html';
 async function bundle(cart: string, output: string) {
   // here we manually copy over the index with the game's source copied in
 
-  let cartdata = await Bun.file("./build/cart.wasm", {type: "application/wasm"}).arrayBuffer();
+  let cartdata = await Bun.file(cart, {type: "application/wasm"}).arrayBuffer();
     
   // let codes = getCharCodesFromSource(cartdata);
   // let encoded_cart = encode(cartdata, codes);
@@ -31,7 +31,7 @@ async function bundle(cart: string, output: string) {
   // usual build semantics
   await Bun.build({
     entrypoints: ['./runtime/index.html'],
-    outdir: './docs',
+    outdir: output.split("/").slice(0, -1).join(""),
     minify: true,
     plugins: [
       html({

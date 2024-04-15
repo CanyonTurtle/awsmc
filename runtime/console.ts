@@ -61,23 +61,107 @@ export function requestFullscreen () {
     }
 }
 
+/**
+ * These configurations are set FROM the .wasm game and go TO the runtime, as 
+ * set by the .wasm game's `configure()` function.
+ * 
+ * These configuration values CAN CHANGE during the runtime of the program, and the
+ * console is designed to adapt to them.
+ */
+type AwsmConfig = {
 
-type AwsmConsole = {
+    /** The framebuffer will be looked for at this address. */
+    framebuffer_addr: number,
+
+    /** Num. pixels in the virtual console's width. */
+    logical_width_px: number,
+
+    /** Num. pixels in the virtual console's width. */
+    logical_height_px: number,
+
+    /** The player input data will be defined here. */
+    inputs_addr: number,  
+
+    /** The number of players that can play in the game. */
+    max_n_players: number,
+
+    /** Where system information flowing FROM the runtime TO the .wasm game will be sent. This includes the physical device width/height. */
+    info_addr: number,
+};
+
+/**
+ * Where system information flowing FROM the runtime TO the
+ * .wasm game will be sent. This includes the physical device width/height, which netplay index this player is, and input.
+ */
+type AwsmInfo = {
+
+    /** Width in pixels of the physical computer/phone/console. */
+    device_width: number,
+
+    /** Height in pixels of the physical computer/phone/console. */
+    device_height: number,
+
+    /** The index of this client's player, zero being player 1, etc... */
+    netplay_player_number: number,
+
+    /**
+     * The touches being pressed by the user. This will be loaded into the designated inputs buffer, TAKING INTO CONSIDERATION
+     * which player # this client is (e.g. if player 2, these touches will be synced with the 2nd position in the input buffer).
+     */
     activeTouches: Map<number, [number, number, number]>,
-    memory: WebAssembly.Memory,
-    width: number,
-    height: number,
-    generation: number,
+
+    /**
+     * This generation is incremented each frame, so that touches can stale without overwriting zeros.
+     */
+    touch_generation: number,
+}
+
+/** The functions the .wasm module is expected to define, that this runtime will call. */
+type AwsmExportedFunctions = {
     _configure: CallableFunction,
     _update: CallableFunction,
 }
+
+/** Built-in functions that are provided to the .wasm module from this runtime. */
+type AwsmBuiltinFunctions = {
+
+};
+
+/**
+ * The entirety of the virtual console's state lives in here.
+ * The Memory is the whole program memory, the config and info are the output from / input to the .wasm module,
+ * and 
+ */
+type AwsmConsole = {
+    
+    /**
+     * The entire console memory at runtime - the framebuffer, game state, configuration, program stack & memory, etc... 
+     * Used in tandem with the `config` property which describes the current layout info of this memory.
+     */
+    memory: WebAssembly.Memory,
+
+    /** The Configuration sent FROM the .wasm cart TO this runtime. */
+    config: AwsmConfig,
+
+    /** The information relayed TO the .wasm cart FROM this runtime. */
+    info: AwsmInfo,
+
+    /** Functions defined in WASM console that this runtime uses. */
+    exported_functions: AwsmExportedFunctions,
+
+    /** Functions provided to the .wasm module from this runtime. */
+    provided_builtins: AwsmBuiltinFunctions
+
+};
+
+
 
 function update_touch_ringbuffer(awsm_console: AwsmConsole) {
     let memory = awsm_console.memory;
     let touchRingBuffer = new Uint8Array(memory.buffer, TOUCH_RINGBUFFER_ADDR, TOUCHES_COUNT * TOUCH_STRUCT_SIZE);
     touchRingBuffer.fill(0);
     let idx = 0;
-    for (const [_, value] of awsm_console.activeTouches.entries()) {
+    for (const [_, value] of awsm_console.info.activeTouches.entries()) {
         // Store touch information in the ring buffer
         let [screenX, screenY, generation] = value;
         const touchIndex = idx * TOUCH_STRUCT_SIZE;
@@ -92,7 +176,7 @@ function update_touch_ringbuffer(awsm_console: AwsmConsole) {
         idx += 1;
     }
 
-    awsm_console.generation += 1;
+    awsm_console.info.touch_generation += 1;
     
 }
 
@@ -103,8 +187,8 @@ function update_touch_ringbuffer(awsm_console: AwsmConsole) {
 function bind_input_handlers(awsm_console: AwsmConsole) {
     
     let mousedown = false;
-    awsm_console.activeTouches = new Map();
-    awsm_console.generation = 0;
+    awsm_console.info.activeTouches = new Map();
+    awsm_console.info.touch_generation = 0;
 
     function handleTouchEvent(event: TouchEvent, removing: boolean) {
         
@@ -134,7 +218,7 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
     function addTouch(id: number, removing: boolean, x: number, y: number) {
         
         if (removing) {
-            awsm_console.activeTouches.delete(id);
+            awsm_console.info.activeTouches.delete(id);
             return;
         }   
 
@@ -150,12 +234,12 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
     
         // If the touch events were oob, delete them.
         if (screenX < 0 || screenX >= canvas.width || screenY < 0 || screenY >= canvas.height) {
-            awsm_console.activeTouches.delete(id);
+            awsm_console.info.activeTouches.delete(id);
             return;
         }
   
         // This will either update existing touches or add new ones, which will preserve the ordering.
-        awsm_console.activeTouches.set(id, [screenX, screenY, awsm_console.generation])
+        awsm_console.info.activeTouches.set(id, [screenX, screenY, awsm_console.info.touch_generation])
 
     }
 
@@ -194,20 +278,20 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
 }
 
 // Define our virtual console
-export function configure(awsm_console: AwsmConsole) {
+export function process_awsm_config(awsm_console: AwsmConsole) {
 
     let memory = awsm_console.memory;
 
     const configData = new Uint16Array(memory.buffer, CONFIG_ADDR, 4);
-    awsm_console.width = configData[0];
-    awsm_console.height = configData[1];
+    awsm_console.config.logical_width_px = configData[0];
+    awsm_console.config.logical_height_px = configData[1];
 
-    const bufferData = new Uint8Array(memory.buffer, FRAMEBUFFER_ADDR, awsm_console.width * awsm_console.height * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
+    const bufferData = new Uint8Array(memory.buffer, FRAMEBUFFER_ADDR, awsm_console.config.logical_width_px * awsm_console.config.logical_height_px * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
 
     // Create WebGL context
     const canvas = document.getElementById('screen') as HTMLCanvasElement;
-    canvas.width = awsm_console.width;
-    canvas.height = awsm_console.height;
+    canvas.width = awsm_console.config.logical_width_px;
+    canvas.height = awsm_console.config.logical_height_px;
     gl = canvas.getContext('webgl') as WebGL2RenderingContext;
 
     if (!gl) {
@@ -258,7 +342,7 @@ export function configure(awsm_console: AwsmConsole) {
     // Create texture for screen buffer
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, awsm_console.width, awsm_console.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, bufferData);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, awsm_console.config.logical_width_px, awsm_console.config.logical_height_px, 0, gl.RGBA, gl.UNSIGNED_BYTE, bufferData);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -268,13 +352,13 @@ export function configure(awsm_console: AwsmConsole) {
 
     // Set resolution uniform
     const resolutionUniformLocation = gl.getUniformLocation(program, 'u_resolution');
-    gl.uniform2f(resolutionUniformLocation, awsm_console.width, awsm_console.height);
+    gl.uniform2f(resolutionUniformLocation, awsm_console.config.logical_width_px, awsm_console.config.logical_height_px);
 
 
     bind_input_handlers(awsm_console);
 }
 
-export function update(awsm_console: AwsmConsole) {
+export function process_awsm_update(awsm_console: AwsmConsole) {
 
     update_touch_ringbuffer(awsm_console);
 
@@ -287,10 +371,10 @@ export function update(awsm_console: AwsmConsole) {
     // console.log(memory) 
     // Your game logic here
     // For now, let's just fill the screen buffer with random colors
-    const bufferData = new Uint8Array(memory.buffer, FRAMEBUFFER_ADDR, awsm_console.width * awsm_console.height * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
+    const bufferData = new Uint8Array(memory.buffer, FRAMEBUFFER_ADDR, awsm_console.config.logical_width_px * awsm_console.config.logical_height_px * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
     // console.log(bufferData)
     // Update the texture with the screen buffer data
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, awsm_console.width, awsm_console.height, gl.RGBA, gl.UNSIGNED_BYTE, bufferData);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, awsm_console.config.logical_width_px, awsm_console.config.logical_height_px, gl.RGBA, gl.UNSIGNED_BYTE, bufferData);
 
     // Clear the screen
     gl.clearColor(0, 0, 0, 1);
@@ -337,14 +421,29 @@ export async function init(): Promise<AwsmConsole> {
     const { instance } = await WebAssembly.instantiate(decoded_cart, imports);
 
     // Expose the configure and update functions
-    let awsm_console = {
-        _configure: instance.exports.configure as Function,
-        _update: instance.exports.update as Function,
+
+    let awsm_console: AwsmConsole = {
         memory: instance.exports.memory as WebAssembly.Memory,
-        width: 64,
-        height: 64,
-        activeTouches: new Map(),
-        generation: 0,
+        config: {
+            framebuffer_addr: 0,
+            logical_width_px: 64,
+            logical_height_px: 64,
+            inputs_addr: 0,
+            max_n_players: 0,
+            info_addr: 0
+        },
+        info: {
+            device_width: 64,
+            device_height: 64,
+            netplay_player_number: 0,
+            activeTouches: new Map(),
+            touch_generation: 0
+        },
+        exported_functions: {
+            _configure: instance.exports.configure as Function,
+            _update: instance.exports.update as Function,
+        },
+        provided_builtins: {}
     };
    
     return awsm_console;
@@ -356,18 +455,18 @@ export default async function run() {
 
     const awsm_console = await init();
 
-    awsm_console._configure();
-    configure(awsm_console);
+    awsm_console.exported_functions._configure();
+    process_awsm_config(awsm_console);
     
     setInterval(() => {
-        awsm_console._update();
-        update(awsm_console);
+        awsm_console.exported_functions._update();
+        process_awsm_update(awsm_console);
     }, 1000 / 60);
     const canvas = document.getElementById('screen') as HTMLCanvasElement;
 
     // Set the canvas internal width and height
-    const canvasWidth = awsm_console.width;
-    const canvasHeight = awsm_console.height;
+    const canvasWidth = awsm_console.config.logical_width_px;
+    const canvasHeight = awsm_console.config.logical_height_px;
     // canvas.width = canvasWidth;
     // canvas.height = canvasHeight; -->
 
@@ -376,6 +475,9 @@ export default async function run() {
         // Get the current size of the canvas container
         const containerWidth = (<any>canvas.parentNode).clientWidth;
         const containerHeight = (<any>canvas.parentNode).clientHeight;
+
+        awsm_console.info.device_width = containerWidth;
+        awsm_console.info.device_height = containerHeight;
 
         // Calculate the scale for width and height
         const scaleWidth = containerWidth / canvasWidth;
