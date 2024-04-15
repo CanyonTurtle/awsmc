@@ -1,3 +1,3 @@
-import awsmc from "./console.ts"
+import awsmc from "./run_console.ts"
 
 awsmc()

@@ -47,11 +47,10 @@ Just publish your HTML file to your site and you've got a game!
 
 [Acknowledgments here.](./acknowledgments.md)
 
-## How does customization occur?
+## How does this work?
 
-The web runtime expects a configure() function. This function can change specific memory locations to specify the location of the framebuffer, the size of memory, width/height of screen, etc...
-
-Right now that is done very loosely and is best-understood by reading `src/game.c` alongside `runtimes/console.ts`, but as I prod out the design I will make this more definite.
+To best understand how this console is designed, [read the
+spec here](./runtime/awsm_console_types.ts).
 
 ## But what about...
 ... Sound? Netplay? Language templates? PNG to source code helpers? And, all of the other amazing features of WASM-4? I mean, why wasn't this just a proper fork of WASM-4?
