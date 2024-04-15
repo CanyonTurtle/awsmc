@@ -29,9 +29,7 @@ var thisLoop: Date = new Date();
 
 
 const FRAMEBUFFER_BYPP = 4;
-const FRAMEBUFFER_ADDR = 0x200;
 const CONFIG_ADDR = 0x10;
-const TOUCH_RINGBUFFER_ADDR = 0x20;
 const TOUCHES_COUNT = 10;
 const TOUCH_STRUCT_SIZE = 6; // 2 bytes for X, 2 bytes for Y, 2 bytes for generation
 
@@ -67,31 +65,45 @@ export function requestFullscreen () {
  * 
  * These configuration values CAN CHANGE during the runtime of the program, and the
  * console is designed to adapt to them.
+ * 
+ * The properties in this config must be written as tightly-packed as possible, at address
+ * 0x10.
  */
 type AwsmConfig = {
 
-    /** The framebuffer will be looked for at this address. */
+    /** The framebuffer will be looked for at this address. u32. */
     framebuffer_addr: number,
 
-    /** Num. pixels in the virtual console's width. */
+    /** Where information flowing FROM the runtime TO the .wasm game will be sent. This includes inputs, the physical device width/height, etc... u32. */
+    info_addr: number,
+
+    /** Num. pixels in the virtual console's width. u16. */
     logical_width_px: number,
 
-    /** Num. pixels in the virtual console's width. */
+    /** Num. pixels in the virtual console's width. u16. */
     logical_height_px: number,
 
-    /** The player input data will be defined here. */
-    inputs_addr: number,  
 
-    /** The number of players that can play in the game. */
+    /** The number of players that can play in the game. u16. */
     max_n_players: number,
 
-    /** Where system information flowing FROM the runtime TO the .wasm game will be sent. This includes the physical device width/height. */
-    info_addr: number,
 };
 
 /**
- * Where system information flowing FROM the runtime TO the
- * .wasm game will be sent. This includes the physical device width/height, which netplay index this player is, and input.
+ * The input of one player. Includes their touchscreen touches and keyboard presses.
+ */
+type PlayerInput = {
+
+    /** The keyboard touches of this player. Maps a touch ID to (touch x u16, touch y u16, generation u16.) */
+    active_touches: Map<number, [number, number, number]>
+
+    /** Packed uint of each keyboard key as a 1 or a 0. left,right,up,down at positions 0123. */
+    keys_input: number,
+}
+
+/**
+ * System information flowing FROM the runtime TO the
+ * .wasm game This includes the physical device width/height, which netplay index this player is, and input.
  */
 type AwsmInfo = {
 
@@ -105,15 +117,15 @@ type AwsmInfo = {
     netplay_player_number: number,
 
     /**
-     * The touches being pressed by the user. This will be loaded into the designated inputs buffer, TAKING INTO CONSIDERATION
-     * which player # this client is (e.g. if player 2, these touches will be synced with the 2nd position in the input buffer).
-     */
-    activeTouches: Map<number, [number, number, number]>,
-
-    /**
      * This generation is incremented each frame, so that touches can stale without overwriting zeros.
      */
     touch_generation: number,
+
+    /**
+     * The touches being pressed by the user. This will be loaded into the designated inputs buffer, TAKING INTO CONSIDERATION
+     * which player # this client is (e.g. if player 2, these touches will be synced with the 2nd position in the input buffer).
+     */
+    player_inputs: Array<PlayerInput>,
 }
 
 /** The functions the .wasm module is expected to define, that this runtime will call. */
@@ -158,10 +170,10 @@ type AwsmConsole = {
 
 function update_touch_ringbuffer(awsm_console: AwsmConsole) {
     let memory = awsm_console.memory;
-    let touchRingBuffer = new Uint8Array(memory.buffer, TOUCH_RINGBUFFER_ADDR, TOUCHES_COUNT * TOUCH_STRUCT_SIZE);
+    let touchRingBuffer = new Uint8Array(memory.buffer, awsm_console.config.info_addr, TOUCHES_COUNT * TOUCH_STRUCT_SIZE);
     touchRingBuffer.fill(0);
     let idx = 0;
-    for (const [_, value] of awsm_console.info.activeTouches.entries()) {
+    for (const [_, value] of awsm_console.info.player_inputs[0].active_touches.entries()) {
         // Store touch information in the ring buffer
         let [screenX, screenY, generation] = value;
         const touchIndex = idx * TOUCH_STRUCT_SIZE;
@@ -187,7 +199,7 @@ function update_touch_ringbuffer(awsm_console: AwsmConsole) {
 function bind_input_handlers(awsm_console: AwsmConsole) {
     
     let mousedown = false;
-    awsm_console.info.activeTouches = new Map();
+    awsm_console.info.player_inputs[0].active_touches = new Map();
     awsm_console.info.touch_generation = 0;
 
     function handleTouchEvent(event: TouchEvent, removing: boolean) {
@@ -218,7 +230,7 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
     function addTouch(id: number, removing: boolean, x: number, y: number) {
         
         if (removing) {
-            awsm_console.info.activeTouches.delete(id);
+            awsm_console.info.player_inputs[0].active_touches.delete(id);
             return;
         }   
 
@@ -234,12 +246,12 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
     
         // If the touch events were oob, delete them.
         if (screenX < 0 || screenX >= canvas.width || screenY < 0 || screenY >= canvas.height) {
-            awsm_console.info.activeTouches.delete(id);
+            awsm_console.info.player_inputs[0].active_touches.delete(id);
             return;
         }
   
         // This will either update existing touches or add new ones, which will preserve the ordering.
-        awsm_console.info.activeTouches.set(id, [screenX, screenY, awsm_console.info.touch_generation])
+        awsm_console.info.player_inputs[0].active_touches.set(id, [screenX, screenY, awsm_console.info.touch_generation])
 
     }
 
@@ -282,11 +294,18 @@ export function process_awsm_config(awsm_console: AwsmConsole) {
 
     let memory = awsm_console.memory;
 
-    const configData = new Uint16Array(memory.buffer, CONFIG_ADDR, 4);
-    awsm_console.config.logical_width_px = configData[0];
-    awsm_console.config.logical_height_px = configData[1];
+    const configData = new Uint16Array(memory.buffer, CONFIG_ADDR, 7);
+    awsm_console.config = {
+        framebuffer_addr:   ((configData[1] << 16) & 0xffff0000) | (configData[0] & 0xffff),
+        info_addr: ((configData[3] << 16) & 0xffff0000) | (configData[2] & 0xffff),
+        logical_width_px: configData[4],
+        logical_height_px: configData[5],
+        max_n_players: configData[6],
+    };
 
-    const bufferData = new Uint8Array(memory.buffer, FRAMEBUFFER_ADDR, awsm_console.config.logical_width_px * awsm_console.config.logical_height_px * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
+    console.log(awsm_console)
+
+    const bufferData = new Uint8Array(memory.buffer, awsm_console.config.framebuffer_addr, awsm_console.config.logical_width_px * awsm_console.config.logical_height_px * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
 
     // Create WebGL context
     const canvas = document.getElementById('screen') as HTMLCanvasElement;
@@ -371,7 +390,7 @@ export function process_awsm_update(awsm_console: AwsmConsole) {
     // console.log(memory) 
     // Your game logic here
     // For now, let's just fill the screen buffer with random colors
-    const bufferData = new Uint8Array(memory.buffer, FRAMEBUFFER_ADDR, awsm_console.config.logical_width_px * awsm_console.config.logical_height_px * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
+    const bufferData = new Uint8Array(memory.buffer, awsm_console.config.framebuffer_addr, awsm_console.config.logical_width_px * awsm_console.config.logical_height_px * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
     // console.log(bufferData)
     // Update the texture with the screen buffer data
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, awsm_console.config.logical_width_px, awsm_console.config.logical_height_px, gl.RGBA, gl.UNSIGNED_BYTE, bufferData);
@@ -426,17 +445,21 @@ export async function init(): Promise<AwsmConsole> {
         memory: instance.exports.memory as WebAssembly.Memory,
         config: {
             framebuffer_addr: 0,
+            info_addr: 0,
             logical_width_px: 64,
             logical_height_px: 64,
-            inputs_addr: 0,
             max_n_players: 0,
-            info_addr: 0
         },
         info: {
             device_width: 64,
             device_height: 64,
             netplay_player_number: 0,
-            activeTouches: new Map(),
+            player_inputs: [
+                {
+                    active_touches: new Map(),
+                    keys_input: 0,
+                },
+            ],
             touch_generation: 0
         },
         exported_functions: {
