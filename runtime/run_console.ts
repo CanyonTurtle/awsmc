@@ -303,7 +303,7 @@ export function process_awsm_update(awsm_console: AwsmConsole) {
 
 export async function init(): Promise<AwsmConsole> {
     // No need to set maximum memory; allow growth.
-    const memory = new WebAssembly.Memory({ initial: 1});
+    const memory = new WebAssembly.Memory({ initial: 1024, maximum: 1024});
     const imports = {
         env: {
             memory,
@@ -341,7 +341,7 @@ export async function init(): Promise<AwsmConsole> {
     // Expose the configure and update functions
 
     let awsm_console: AwsmConsole = {
-        memory: instance.exports.memory as WebAssembly.Memory,
+        memory,
         config: {
             framebuffer_addr: 0,
             info_addr: 0,
