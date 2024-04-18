@@ -64,8 +64,8 @@ void rect_unchecked(uint8_t* framebuffer, uint16_t sx, const uint16_t sy, const 
 }
 
 // Helpers.
-#define MIN(a,b) (((a)<(b))?(a):(b))
-#define MAX(a,b) (((a)>(b))?(a):(b))
+#define MIN(a,b) (uint16_t)((((int16_t)a)<((int16_t)b))?((int16_t)a):((int16_t)b))
+#define MAX(a,b) (uint16_t)((((int16_t)a)>((int16_t)b))?((int16_t)a):((int16_t)b))
 
 // Helper for drawing rectangles, making sure they don't go out of bounds of the framebuffer.
 void rect(uint8_t* framebuffer, const int16_t sx, const int16_t sy, const uint16_t w, const uint16_t h, const uint8_t color[4]) {
@@ -75,7 +75,7 @@ void rect(uint8_t* framebuffer, const int16_t sx, const int16_t sy, const uint16
 
 // This function is expected to be here in the .wasm.
 // It must write the configuration settings.
-void configure() {
+void configure(void) {
 
     // Set the screen buffer address
     timer = (uint32_t*)(awsm_config.framebuffer_addr+SCREEN_HEIGHT*SCREEN_WIDTH*FRAMEBUFFER_BYPP);
@@ -87,15 +87,15 @@ void configure() {
 #define BUTTON_SIZE 20
 
 // This function is expected to be in the .wasm to update the screen, etc...
-void update() {
+void update(void) {
     timer[0] += 1;
     // Your game logic here
     // For now, let's just fill the screen buffer with random colors
-    for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) {
-        framebuffer[i * 4] = (i*2 + timer[0]/2) % 220;        // R
-        framebuffer[i * 4 + 1] = (i*3 + timer[0]/14) % 256;  // G
-        framebuffer[i * 4 + 2] = (i*5 + timer[0]/8) % 199; // B
-        framebuffer[i * 4 + 3] = (i*11 + timer[0]/22) % 256;    // A
+    for (uint32_t i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) {
+        framebuffer[i * 4] = (uint8_t)(((uint32_t)pow(i*2, 1.4) + timer[0]/2) % 256);        // R
+        framebuffer[i * 4 + 1] = (uint8_t)(((uint32_t)pow(i*3, 0.9) + timer[0]/14) % 256);  // G
+        framebuffer[i * 4 + 2] = (uint8_t)(((uint32_t)pow(i, 2)/10 + timer[0]/8) % 256); // B
+        framebuffer[i * 4 + 3] = (uint8_t)(((uint32_t)sqrt(i*2) + timer[0] / 100) % 256);    // A
     }
 
     // Access touch data from the buffer

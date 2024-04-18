@@ -33,7 +33,7 @@ cd awsmc
 bun install
 
 # Compile the game to a WASM file
-emcc src/game.c -o build/cart.wasm -s EXPORTED_FUNCTIONS="['_configure', '_update']" -s STACK_SIZE=8mb --no-entry
+emcc src/game.c -o build/cart.wasm -s EXPORTED_FUNCTIONS="['_configure', '_update']" -Oz -s STACK_SIZE=8mb --no-entry -Wl,--stack-first
 
 # Bundle the WASM file into a playable HTML file.
 bun run awsmc.ts bundle build/cart.wasm build/index.html
