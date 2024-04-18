@@ -38,7 +38,7 @@ emcc src/game.c -Wpedantic -W -Wall -Wextra -Werror -Wno-unused -Wconversion -Ws
 # Bundle the WASM file into a playable HTML file.
 bun run awsmc.ts bundle build/cart.wasm build/index.html
 
-emcc src/game.c -o build/cart.wasm -s EXPORTED_FUNCTIONS="['_configure', '_update']" -s STACK_SIZE=8mb -DNDEBUG -Oz -flto --no-entry -Wl,--import-memory,--initial-memory=67108864,--stack-first && bun run awsmc.ts bundle build/cart.wasm build/index.html
+emcc src/game.c -o build/cart.wasm -s EXPORTED_FUNCTIONS="['_configure', '_update']" -s STACK_SIZE=8mb -Oz --no-entry -Wl,--stack-first && bun run awsmc.ts bundle build/cart.wasm build/index.html
 ```
 
 Now open `build/index.html`. You don't even have to "serve" the site - just opening in a browser will do. If all goes well, you should see a playable game!
