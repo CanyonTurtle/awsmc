@@ -1,4 +1,4 @@
-import {encode} from "./runtime/z85.ts";
+import {encode} from "./runtime/base64.ts";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import html from 'bun-plugin-html';
@@ -12,9 +12,7 @@ async function bundle(cart: string, output: string) {
   // let encoded_cart = encode(cartdata, codes);
 
   // const encoded = Buffer.from((<any>cartdata), 'binary').toString('base64')
-  const encoded = encode(Buffer.from((<any>cartdata), 'binary'))
-
-  await Bun.write("./build/encoded.txt", encoded);
+  const encoded = encode(Buffer.from((<any>cartdata), 'binary'), undefined)
 
   let ht = await Bun.file("./runtime/app.html").text();
   let rewriter = new HTMLRewriter()

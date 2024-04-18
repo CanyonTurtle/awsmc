@@ -1,7 +1,7 @@
 import type {AwsmConsole} from "./awsm_console_types.ts"
 
 // import cart from "../build/cart.wasm"
-import {decode} from "./z85.ts"
+import {decode} from "./base64.ts"
 
 let gl: WebGL2RenderingContext;
 
@@ -333,8 +333,7 @@ export async function init(): Promise<AwsmConsole> {
     //     return bytes.buffer;
     // }
 
-    const decoded_cart = new Uint8Array(encoded_len);
-    decode(encoded, decoded_cart)
+    const decoded_cart = decode(encoded, undefined);
 
     const { instance } = await WebAssembly.instantiate(decoded_cart, imports);
 
