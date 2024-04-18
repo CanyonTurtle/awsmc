@@ -14,6 +14,8 @@ async function bundle(cart: string, output: string) {
   // const encoded = Buffer.from((<any>cartdata), 'binary').toString('base64')
   const encoded = encode(Buffer.from((<any>cartdata), 'binary'))
 
+  await Bun.write("./build/encoded.txt", encoded);
+
   let ht = await Bun.file("./runtime/app.html").text();
   let rewriter = new HTMLRewriter()
 

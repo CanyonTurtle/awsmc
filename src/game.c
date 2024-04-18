@@ -92,10 +92,10 @@ void update(void) {
     // Your game logic here
     // For now, let's just fill the screen buffer with random colors
     for (uint32_t i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) {
-        framebuffer[i * 4] = (uint8_t)(((uint32_t)pow(i*2, 1.4) + timer[0]/2) % 256);        // R
+        framebuffer[i * 4] = (uint8_t)(((uint32_t)pow(i*2, 1.4) + timer[0]/2) % 200) + 30;        // R
         framebuffer[i * 4 + 1] = (uint8_t)(((uint32_t)pow(i*3, 0.9) + timer[0]/14) % 256);  // G
-        framebuffer[i * 4 + 2] = (uint8_t)(((uint32_t)pow(i, 2)/10 + timer[0]/8) % 256); // B
-        framebuffer[i * 4 + 3] = (uint8_t)((i + timer[0]) % 256);    // A
+        framebuffer[i * 4 + 2] = (uint8_t)(((uint32_t)pow(i, 2)/10 + (uint32_t)pow(timer[0], 1.4)) % 220); // B
+        framebuffer[i * 4 + 3] = (uint8_t)(((uint32_t)pow(i, 0.95) + (uint32_t)pow(timer[0], 0.9)) % 50) + 130;    // A
     }
 
     // Access touch data from the buffer
