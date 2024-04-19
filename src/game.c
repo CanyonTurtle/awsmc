@@ -99,11 +99,14 @@ void update(void) {
     // Your game logic here
     // For now, let's just fill the screen buffer with random colors
     float add_mult = 0.5f;
-    if (1) {
-        
 
+    char triggered = 0;
+    int16_t xx = 0;
+    int16_t yy = 0;
+    uint8_t rc[4];
+    if(game_state->timer < 2) {
+        triggered = 1;
     }
-
 
     // Access touch data from the buffer
     char any = 0;
@@ -117,26 +120,34 @@ void update(void) {
         if (x != 0 && y != 0 && generation) {
             any = 1;
             
-            uint8_t rc[4];
+            
             for(int j = 0; j < 4; j++) {
                 rc[j] = framebuffer[(y*SCREEN_WIDTH+x)*4+j]; 
             }
             if (!game_state->just_touched) {
                 game_state->just_touched = 1;
-                for (uint32_t i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) {
-                    framebuffer[i * 4] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i*2, 1.2) + game_state->timer/2) % 200) + 30);        // R
-                    framebuffer[i * 4 + 1] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i*3, 1.01) + game_state->timer/14) % 256));  // G
-                    framebuffer[i * 4 + 2] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i*5, 0.99)/10 + game_state->timer) % 220)); // B
-                    framebuffer[i * 4 + 3] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i, 1.1) + (uint32_t)pow(game_state->timer, 0.9))%190) + 10);    // A
-                }
+                triggered = 1;
+                
             }
-            rect(framebuffer, x - BUTTON_SIZE / 2, y - BUTTON_SIZE / 2,BUTTON_SIZE,BUTTON_SIZE, rc);
+            xx = x - BUTTON_SIZE / 2;
+            yy = y - BUTTON_SIZE / 2;
+            rect(framebuffer, xx, yy,BUTTON_SIZE,BUTTON_SIZE, rc);
         }
 
     }
 
     if(!any) {
         game_state->just_touched=0;
+    }
+
+    if(triggered) {
+        for (uint32_t i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) {
+            framebuffer[i * 4] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i*2, 1.2) + game_state->timer/2) % 200) + 30);        // R
+            framebuffer[i * 4 + 1] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i*3, 1.01) + game_state->timer/14) % 256));  // G
+            framebuffer[i * 4 + 2] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i*5, 0.99)/10 + game_state->timer) % 220)); // B
+            framebuffer[i * 4 + 3] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i, 1.1) + (uint32_t)pow(game_state->timer, 0.9))%190) + 10);    // A
+        }
+        rect(framebuffer, xx, yy,BUTTON_SIZE,BUTTON_SIZE, rc);
     }
 
     float blur_rate = 0.254;
