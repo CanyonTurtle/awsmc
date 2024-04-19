@@ -31,7 +31,6 @@ var thisLoop: Date = new Date();
 
 
 const FRAMEBUFFER_BYPP = 4;
-const CONFIG_ADDR = 0x10;
 const TOUCHES_COUNT = 10;
 const TOUCH_STRUCT_SIZE = 6; // 2 bytes for X, 2 bytes for Y, 2 bytes for generation
 
@@ -187,12 +186,12 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
 }
 
 // Define our virtual console
-export function process_awsm_config(awsm_console: AwsmConsole) {
+export function process_awsm_config(awsm_console: AwsmConsole, config_addr: number) {
 
     let memory = awsm_console.memory;
 
     // Load in the settings from the .wasm console, as set in configure().
-    const configData = new Uint16Array(memory.buffer, CONFIG_ADDR, 7);
+    const configData = new Uint16Array(memory.buffer, config_addr, 7);
     awsm_console.config = {
         framebuffer_addr:   ((configData[1] << 16) & 0xffff0000) | (configData[0] & 0xffff),
         info_addr: ((configData[3] << 16) & 0xffff0000) | (configData[2] & 0xffff),
@@ -376,8 +375,8 @@ export default async function run() {
 
     const awsm_console = await init();
 
-    awsm_console.exported_functions._configure();
-    process_awsm_config(awsm_console);
+    const config_addr = awsm_console.exported_functions._configure();
+    process_awsm_config(awsm_console, config_addr);
     
     setInterval(() => {
         awsm_console.exported_functions._update();

@@ -13,8 +13,8 @@
  * These configuration values CAN CHANGE during the runtime of the program, and the
  * console is designed to adapt to them.
  * 
- * The properties in this config must be written as tightly-packed as possible, at address
- * 0x10.
+ * The properties in this config must be written as tightly-packed as possible, at the memory address
+ * returned by the configure() function.
  */
 export type AwsmConfig = {
 
