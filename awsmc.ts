@@ -17,12 +17,17 @@ async function bundle(cart: string, output: string) {
   let ht = await Bun.file("./runtime/app.html").text();
   let rewriter = new HTMLRewriter()
 
+
+  // spritesheet
+  let spritesheet_data = await Bun.file("./smiley.png", {type: "image/png"}).arrayBuffer();
+  const encoded_spritesheet = encode(Buffer.from((<any>spritesheet_data), 'binary'), undefined)
   // let codes_json = JSON.stringify(codes, (key, value) => (value instanceof Map ? [...value] : value));
 
   rewriter.on("div#cartdata", {
     element(el) {
       el.setAttribute("data-cart", encoded)
       el.setAttribute("data-cartlen", cartdata.byteLength.toString())
+      el.setAttribute("data-spritesheet", `data:image/png;base64,${encoded_spritesheet}`)
     }
   })
   await Bun.write("runtime/index.html", rewriter.transform(ht));

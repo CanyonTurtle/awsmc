@@ -313,6 +313,16 @@ export async function init(): Promise<AwsmConsole> {
     const encoded = cartdata_el.getAttribute("data-cart")!;
     const encoded_len = Number(cartdata_el.getAttribute("data-cartlen")!)!;
 
+    const spritesheet_src = cartdata_el.getAttribute("data-spritesheet")!;
+    const ss_img = new Image();
+    ss_img.src = spritesheet_src;
+    const ss_canvas = <HTMLCanvasElement> document.getElementById("spritesheet_canvas")!;
+    const ss_ctx = ss_canvas.getContext("2d")!;
+    await ss_img.decode();
+    ss_canvas.width = ss_img.width;
+    ss_canvas.height = ss_img.height;
+    ss_ctx.drawImage(ss_img, 0, 0);
+    
     // console.log(encoded)
 
     // function asciiToBinary(str: any) {
