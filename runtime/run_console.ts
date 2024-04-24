@@ -1,4 +1,4 @@
-import type {AwsmConsole} from "./awsm_console_types.ts"
+import type {AwsmConsole} from "./awsmc_console_types.ts"
 
 // import cart from "../build/cart.wasm"
 import {decode} from "./base64.ts"

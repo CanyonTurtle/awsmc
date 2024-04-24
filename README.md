@@ -2,7 +2,7 @@
 
 [Live multi-touch demo!](https://canyonturtle.github.io/awsmc/)
 
-AWSM is a highly-customizable virtual console, targetting web-capable platforms.
+awsmc is a highly-customizable virtual console, targetting web-capable platforms.
 
 ## About
 
@@ -50,7 +50,7 @@ Just publish your HTML file to your site and you've got a game!
 ## How does this work?
 
 To best understand how this console is designed, [read the
-spec here](./runtime/awsm_console_types.ts).
+spec here](./runtime/awsmc_console_types.ts).
 
 ## But what about...
 ... Sound? Netplay? Language templates? PNG to source code helpers? And, all of the other amazing features of WASM-4? I mean, why wasn't this just a proper fork of WASM-4?

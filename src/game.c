@@ -7,8 +7,8 @@
 #define FRAMEBUFFER_BYPP 4
 
 // You can decide these!
-#define SCREEN_WIDTH 160
-#define SCREEN_HEIGHT 256
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 224
 #define BUTTON_SIZE 15
 
 // You can also decide where the framebuffer should be.
