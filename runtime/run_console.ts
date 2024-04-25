@@ -186,22 +186,52 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
 }
 
 // Define our virtual console
-export function process_awsm_config(awsm_console: AwsmConsole, config_addr: number) {
+export async function process_awsm_config(awsm_console: AwsmConsole, config_addr: number) {
 
     let memory = awsm_console.memory;
 
     // Load in the settings from the .wasm console, as set in configure().
-    const configData = new Uint16Array(memory.buffer, config_addr, 7);
+    const configData = new Uint16Array(memory.buffer, config_addr, 9);
     awsm_console.config = {
-        framebuffer_addr:   ((configData[1] << 16) & 0xffff0000) | (configData[0] & 0xffff),
+        framebuffer_addr: ((configData[1] << 16) & 0xffff0000) | (configData[0] & 0xffff),
         info_addr: ((configData[3] << 16) & 0xffff0000) | (configData[2] & 0xffff),
-        logical_width_px: configData[4],
-        logical_height_px: configData[5],
-        max_n_players: configData[6],
+        spritesheet_addr: ((configData[5] << 16) & 0xffff0000) | (configData[4] & 0xffff),
+        logical_width_px: configData[6],
+        logical_height_px: configData[7],
+        max_n_players: configData[8],
     };
+    console.log(awsm_console)
+
+    // if the game author specified a spritesheet address, load the spritesheet into the console's memory
+    if (awsm_console.config.spritesheet_addr != 0) {
+
+        // load in the spritesheet
+        const cartdata_el = document.getElementById("cartdata")!;
+        const spritesheet_src = cartdata_el.getAttribute("data-spritesheet")!;
+
+        // create an image using the base64 url of the spritesheet, and wait for it to load
+        const ss_img = new Image();
+        ss_img.src = spritesheet_src;
+        await ss_img.decode();
+
+        // create a temporary canvas to render the image into bytes
+        
+        const ss_canvas = <HTMLCanvasElement> document.createElement("canvas")!;
+        const ss_ctx = ss_canvas.getContext("2d")!;
+        
+        // Draw the image out, to rasterize it into RGBA bytes
+        ss_canvas.width = ss_img.width;
+        ss_canvas.height = ss_img.height;
+        ss_ctx.drawImage(ss_img, 0, 0);
+        const ss_bytes = ss_ctx.getImageData(0, 0, ss_img.width, ss_img.height).data;
+
+        // Copy the spritesheet into the console's memory at the spritesheet address
+        const ss_buffer = new Uint8Array(memory.buffer, awsm_console.config.spritesheet_addr, ss_img.width * ss_img.height * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
+        ss_buffer.set(ss_bytes);
+    }
+
 
     const bufferData = new Uint8Array(memory.buffer, awsm_console.config.framebuffer_addr, awsm_console.config.logical_width_px * awsm_console.config.logical_height_px * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
-
     // Create WebGL context
     const canvas = document.getElementById('screen') as HTMLCanvasElement;
     canvas.width = awsm_console.config.logical_width_px;
@@ -313,15 +343,7 @@ export async function init(): Promise<AwsmConsole> {
     const encoded = cartdata_el.getAttribute("data-cart")!;
     const encoded_len = Number(cartdata_el.getAttribute("data-cartlen")!)!;
 
-    const spritesheet_src = cartdata_el.getAttribute("data-spritesheet")!;
-    const ss_img = new Image();
-    ss_img.src = spritesheet_src;
-    const ss_canvas = <HTMLCanvasElement> document.getElementById("spritesheet_canvas")!;
-    const ss_ctx = ss_canvas.getContext("2d")!;
-    await ss_img.decode();
-    ss_canvas.width = ss_img.width;
-    ss_canvas.height = ss_img.height;
-    ss_ctx.drawImage(ss_img, 0, 0);
+    
     
     // console.log(encoded)
 
@@ -353,6 +375,7 @@ export async function init(): Promise<AwsmConsole> {
         config: {
             framebuffer_addr: 0,
             info_addr: 0,
+            spritesheet_addr: 0,
             logical_width_px: 64,
             logical_height_px: 64,
             max_n_players: 0,
@@ -386,7 +409,7 @@ export default async function run() {
     const awsm_console = await init();
 
     const config_addr = awsm_console.exported_functions._configure();
-    process_awsm_config(awsm_console, config_addr);
+    await process_awsm_config(awsm_console, config_addr);
     
     setInterval(() => {
         awsm_console.exported_functions._update();

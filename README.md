@@ -35,8 +35,8 @@ bun install
 # Compile the game to a WASM file
 emcc src/game.c -o build/cart.wasm -s EXPORTED_FUNCTIONS="['_configure', '_update']" -s STACK_SIZE=8mb -Oz --no-entry -Wl,--stack-first
 
-# Bundle the WASM file into a playable HTML file.
-bun run awsmc.ts bundle build/cart.wasm build/index.html
+# Bundle the WASM file & spritesheet into a playable HTML file.
+bun run awsmc.ts bundle build/cart.wasm build/index.html src/awsmc.png
 ```
 
 Now open `build/index.html`. You don't even have to "serve" the site - just opening in a browser will do. If all goes well, you should see a playable game!

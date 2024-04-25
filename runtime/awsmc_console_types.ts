@@ -24,6 +24,9 @@ export type AwsmConfig = {
     /** Where information flowing FROM the runtime TO the .wasm game will be sent. This includes inputs, the physical device width/height, etc... u32. */
     info_addr: number,
 
+    /** If nonzero, where the optionally-provided RGBA spritesheet will be loaded into console memory after `configure()` and before `update()`. u32. */
+    spritesheet_addr: number,
+
     /** Num. pixels in the virtual console's width. u16. */
     logical_width_px: number,
 

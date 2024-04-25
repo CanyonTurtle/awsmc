@@ -2,18 +2,26 @@
 #include <stdlib.h>
 #include <math.h>
 
+// Please read "awsmc_console_types.ts". That explains how the console works, and will help
+// make `configure()` and `update()` make more sense.
 
 // The framebuffer is 4 bytes per pixel - r, g, b, A.
 #define FRAMEBUFFER_BYPP 4
 
 // You can decide these!
 #define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 224
+#define SCREEN_HEIGHT 192
 #define BUTTON_SIZE 15
 
 // You can also decide where the framebuffer should be.
 // Make sure it doesn't overlap other important regions of memory.
 uint8_t framebuffer[SCREEN_WIDTH*SCREEN_HEIGHT*FRAMEBUFFER_BYPP];
+
+#define SPRITESHEET_WIDTH 89
+#define SPRITESHEET_HEIGHT 16
+
+// You can decide if and where the spritesheet should be.
+uint8_t spritesheet[SPRITESHEET_WIDTH*SPRITESHEET_HEIGHT*FRAMEBUFFER_BYPP];
 
 typedef struct {
     uint16_t x;
@@ -38,6 +46,7 @@ GameState game_state = {
 typedef struct {
     uint32_t* framebuffer_addr;
     uint32_t* info_addr;
+    uint32_t* spritesheet_addr;
     uint16_t logical_width_px;
     uint16_t logical_height_px;
     uint16_t max_n_players;
@@ -75,6 +84,7 @@ AwsmConfig* configure(void) {
     AwsmConfig config = {
         .framebuffer_addr= (uint32_t*)&framebuffer,
         .info_addr = (uint32_t*)&touch_buffer,
+        .spritesheet_addr = (uint32_t*)&spritesheet,
         .logical_width_px = SCREEN_WIDTH,
         .logical_height_px = SCREEN_HEIGHT,
         .max_n_players = 1,
@@ -82,6 +92,32 @@ AwsmConfig* configure(void) {
     awsm_config = config;
     // Here we fill in the settings.
     return &awsm_config;
+}
+
+void draw_sprite(
+    uint8_t* framebuffer,
+    uint8_t* spritesheet,
+    uint16_t sx,
+    uint16_t sy,
+    uint16_t ss_stride,
+    int16_t x,
+    int16_t y,
+    uint16_t stride,
+    uint16_t w,
+    uint16_t h
+) {
+    for(uint32_t i = 0; i < h; i++) {
+        for(uint32_t j = 0; j < w; j++) {
+            uint8_t alpha = spritesheet[((sy+i)*ss_stride+(sx+j))*FRAMEBUFFER_BYPP+3];
+            if (alpha != 0) {
+                framebuffer[((y+i)*stride+(x+j))*FRAMEBUFFER_BYPP] = spritesheet[((sy+i)*ss_stride+(sx+j))*FRAMEBUFFER_BYPP];
+                framebuffer[((y+i)*stride+(x+j))*FRAMEBUFFER_BYPP+1] = spritesheet[((sy+i)*ss_stride+(sx+j))*FRAMEBUFFER_BYPP+1];
+                framebuffer[((y+i)*stride+(x+j))*FRAMEBUFFER_BYPP+2] = spritesheet[((sy+i)*ss_stride+(sx+j))*FRAMEBUFFER_BYPP+2];
+                framebuffer[((y+i)*stride+(x+j))*FRAMEBUFFER_BYPP+3] = alpha;
+            }
+
+        }
+    }
 }
 
 
@@ -160,5 +196,7 @@ void update(void) {
             }
         }
     }
+
     
+    draw_sprite((uint8_t*)&framebuffer, (uint8_t*)&spritesheet, 0, 0, SPRITESHEET_WIDTH, SCREEN_WIDTH / 2 - SPRITESHEET_WIDTH / 2, SCREEN_HEIGHT / 2 - SPRITESHEET_HEIGHT / 2, SCREEN_WIDTH, SPRITESHEET_WIDTH, SPRITESHEET_HEIGHT);
 }
