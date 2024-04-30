@@ -80,8 +80,8 @@ export type AwsmInfo = {
 
 /** The functions the .wasm module is expected to define, that this runtime will call. */
 export type AwsmExportedFunctions = {
-    _configure: CallableFunction,
-    _update: CallableFunction,
+    _configure: CallableFunction | undefined,
+    _update: CallableFunction | undefined,
 };
 
 /** Built-in functions that are provided to the .wasm module from this runtime. */
@@ -100,7 +100,23 @@ export type AwsmConsole = {
      * The entire console memory at runtime - the framebuffer, game state, configuration, program stack & memory, etc... 
      * Used in tandem with the `config` property which describes the current layout info of this memory.
      */
-    memory: WebAssembly.Memory,
+    memory: WebAssembly.Memory | undefined,
+
+    /** Views into the console's memory. */
+    buffers: {
+        /** Section of console memory where configuration lives. */
+        config: Uint16Array | undefined,
+
+        /** Section of console memory where screen pixel data lives. */
+        framebuffer: Uint8Array | undefined,
+
+        /** Section of console memory where inputs live.  */
+        inputs: Uint8Array | undefined,
+
+        /** Section of memory where spritesheet lives. */
+        spritesheet_buffer: Uint8Array | undefined,
+    },
+    
 
     /** The Configuration sent FROM the .wasm cart TO this runtime. */
     config: AwsmConfig,

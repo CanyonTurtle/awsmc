@@ -66,19 +66,20 @@ export function requestFullscreen () {
 
 function update_touch_ringbuffer(awsm_console: AwsmConsole) {
     let memory = awsm_console.memory;
-    let touchRingBuffer = new Uint8Array(memory.buffer, awsm_console.config.info_addr, TOUCHES_COUNT * TOUCH_STRUCT_SIZE);
-    touchRingBuffer.fill(0);
+    awsm_console.buffers.inputs = new Uint8Array(memory!.buffer, awsm_console.config.info_addr, TOUCHES_COUNT * TOUCH_STRUCT_SIZE);
+    const ips = awsm_console.buffers.inputs;
+    ips.fill(0);
     let idx = 0;
     for (const [_, value] of awsm_console.info.player_inputs[0].active_touches.entries()) {
         // Store touch information in the ring buffer
         let [screenX, screenY, generation] = value;
         const touchIndex = idx * TOUCH_STRUCT_SIZE;
-        touchRingBuffer[touchIndex + 1] = (screenX >> 8) & 0xff;
-        touchRingBuffer[touchIndex + 0] = screenX;
-        touchRingBuffer[touchIndex + 3] = (screenY >> 8) & 0xff;
-        touchRingBuffer[touchIndex + 2] = screenY;
-        touchRingBuffer[touchIndex + 5] = (generation >> 8) & 0xff;
-        touchRingBuffer[touchIndex + 4] = generation;
+        ips[touchIndex + 1] = (screenX >> 8) & 0xff;
+        ips[touchIndex + 0] = screenX;
+        ips[touchIndex + 3] = (screenY >> 8) & 0xff;
+        ips[touchIndex + 2] = screenY;
+        ips[touchIndex + 5] = (generation >> 8) & 0xff;
+        ips[touchIndex + 4] = generation;
 
         // nextTouchIndex = (nextTouchIndex + 1) % TOUCHES_COUNT;
         idx += 1;
@@ -191,14 +192,15 @@ export async function process_awsm_config(awsm_console: AwsmConsole, config_addr
     let memory = awsm_console.memory;
 
     // Load in the settings from the .wasm console, as set in configure().
-    const configData = new Uint16Array(memory.buffer, config_addr, 9);
+    awsm_console.buffers.config = new Uint16Array(memory!.buffer, config_addr, 9);
+    const cd = awsm_console.buffers.config;
     awsm_console.config = {
-        framebuffer_addr: ((configData[1] << 16) & 0xffff0000) | (configData[0] & 0xffff),
-        info_addr: ((configData[3] << 16) & 0xffff0000) | (configData[2] & 0xffff),
-        spritesheet_addr: ((configData[5] << 16) & 0xffff0000) | (configData[4] & 0xffff),
-        logical_width_px: configData[6],
-        logical_height_px: configData[7],
-        max_n_players: configData[8],
+        framebuffer_addr: ((cd[1] << 16) & 0xffff0000) | (cd[0] & 0xffff),
+        info_addr: ((cd[3] << 16) & 0xffff0000) | (cd[2] & 0xffff),
+        spritesheet_addr: ((cd[5] << 16) & 0xffff0000) | (cd[4] & 0xffff),
+        logical_width_px: cd[6],
+        logical_height_px: cd[7],
+        max_n_players: cd[8],
     };
     console.log(awsm_console)
 
@@ -226,12 +228,12 @@ export async function process_awsm_config(awsm_console: AwsmConsole, config_addr
         const ss_bytes = ss_ctx.getImageData(0, 0, ss_img.width, ss_img.height).data;
 
         // Copy the spritesheet into the console's memory at the spritesheet address
-        const ss_buffer = new Uint8Array(memory.buffer, awsm_console.config.spritesheet_addr, ss_img.width * ss_img.height * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
-        ss_buffer.set(ss_bytes);
+        awsm_console.buffers.spritesheet_buffer = new Uint8Array(memory!.buffer, awsm_console.config.spritesheet_addr, ss_img.width * ss_img.height * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
+        awsm_console.buffers.spritesheet_buffer.set(ss_bytes);
     }
 
 
-    const bufferData = new Uint8Array(memory.buffer, awsm_console.config.framebuffer_addr, awsm_console.config.logical_width_px * awsm_console.config.logical_height_px * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
+    awsm_console.buffers.framebuffer = new Uint8Array(memory!.buffer, awsm_console.config.framebuffer_addr, awsm_console.config.logical_width_px * awsm_console.config.logical_height_px * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
     // Create WebGL context
     const canvas = document.getElementById('screen') as HTMLCanvasElement;
     canvas.width = awsm_console.config.logical_width_px;
@@ -286,7 +288,7 @@ export async function process_awsm_config(awsm_console: AwsmConsole, config_addr
     // Create texture for screen buffer
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, awsm_console.config.logical_width_px, awsm_console.config.logical_height_px, 0, gl.RGBA, gl.UNSIGNED_BYTE, bufferData);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, awsm_console.config.logical_width_px, awsm_console.config.logical_height_px, 0, gl.RGBA, gl.UNSIGNED_BYTE, awsm_console.buffers.framebuffer);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -306,21 +308,14 @@ export function process_awsm_update(awsm_console: AwsmConsole) {
 
     update_touch_ringbuffer(awsm_console);
 
-    let memory = awsm_console.memory;
+    // calculate fps timing
     thisLoop = new Date();
     let thisFrameTime = thisLoop.getTime() - lastLoop.getTime();
     frameTime += (thisFrameTime - frameTime) / filterStrength;
     lastLoop = thisLoop;
 
-    // the framebuffer data for this frame.
-    const framebuffer_data_this_frame = new Uint8Array(
-        memory.buffer,
-        awsm_console.config.framebuffer_addr,
-        awsm_console.config.logical_width_px * awsm_console.config.logical_height_px * FRAMEBUFFER_BYPP
-    );
-
     // Update the texture with the screen buffer data
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, awsm_console.config.logical_width_px, awsm_console.config.logical_height_px, gl.RGBA, gl.UNSIGNED_BYTE, framebuffer_data_this_frame);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, awsm_console.config.logical_width_px, awsm_console.config.logical_height_px, gl.RGBA, gl.UNSIGNED_BYTE, awsm_console.buffers.framebuffer!);
 
     // Clear the screen
     gl.clearColor(0, 0, 0, 1);
@@ -331,47 +326,15 @@ export function process_awsm_update(awsm_console: AwsmConsole) {
 }
 
 export async function init(): Promise<AwsmConsole> {
-    // No need to set maximum memory; allow growth.
-    // const memory = new WebAssembly.Memory({ initial: 1024, maximum: 1024});
-    const imports = {
-        env: {
-            // memory,
-        },
-    };
-
-    const cartdata_el = document.getElementById("cartdata")!;
-    const encoded = cartdata_el.getAttribute("data-cart")!;
-    const encoded_len = Number(cartdata_el.getAttribute("data-cartlen")!)!;
-
-    
-    
-    // console.log(encoded)
-
-    // function asciiToBinary(str: any) {
-    //     if (typeof atob === 'function') {
-    //         return atob(str)
-    //     } else {
-    //         return new Buffer(str, 'base64').toString('binary');
-    //     }
-    // }
-
-    // function decode(encoded: any) {
-    //     var binaryString = asciiToBinary(encoded);
-    //     var bytes = new Uint8Array(binaryString.length);
-    //     for (var i = 0; i < binaryString.length; i++) {
-    //         bytes[i] = binaryString.charCodeAt(i);
-    //     }
-    //     return bytes.buffer;
-    // }
-
-    const decoded_cart = decode(encoded, undefined);
-
-    const { instance } = await WebAssembly.instantiate(decoded_cart, imports);
-
-    // Expose the configure and update functions
 
     let awsm_console: AwsmConsole = {
-        memory: instance.exports.memory as WebAssembly.Memory,
+        memory: undefined,
+        buffers: {
+            config: undefined,
+            framebuffer: undefined,
+            inputs: undefined,
+            spritesheet_buffer: undefined
+        },
         config: {
             framebuffer_addr: 0,
             info_addr: 0,
@@ -393,11 +356,79 @@ export async function init(): Promise<AwsmConsole> {
             touch_generation: 0
         },
         exported_functions: {
-            _configure: instance.exports.configure as Function,
-            _update: instance.exports.update as Function,
+            _configure: undefined,
+            _update: undefined,
         },
         provided_builtins: {}
     };
+
+    // No need to set maximum memory; allow growth.
+    // const memory = new WebAssembly.Memory({ initial: 1024, maximum: 1024});
+    const imports = {
+        env: {
+            // memory,
+            blit(
+                src_addr: number,
+                sx: number,
+                sy: number,
+                s_stride: number,
+                dest_addr: number,
+                dx: number,
+                dy: number,
+                d_stride: number,
+                w: number,
+                h: number,
+                flags: number,  
+            ) {
+                // grab framebuffer. 
+                // We try to reuse our buffer object 
+                // if it's just the usual framebuffer.
+                let dest_buffer;
+                if (dest_addr === awsm_console.config.framebuffer_addr) {
+                    dest_buffer = awsm_console.buffers.framebuffer!;
+                } else {
+                    dest_buffer = new Uint8Array(awsm_console.memory!.buffer, dest_addr);
+                }
+
+                // grab spritesheet. We try to reuse our spritesheet object
+                // if it's just the usual spritesheet.
+                let src_buffer;
+                if (src_addr === awsm_console.config.spritesheet_addr) {
+                    src_buffer = awsm_console.buffers.spritesheet_buffer!;
+                } else {
+                    src_buffer = new Uint8Array(awsm_console.memory!.buffer, src_addr);
+                }
+                
+                for (let i = 0; i < h; i++){
+                    for (let j = 0; j < w; j++) {
+                        let alpha: number = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP+3];
+                        if (alpha !== 0) {
+                            dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP] = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP];
+                            dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP+1] = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP+1];
+                            dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP+2] = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP+2];
+                            dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP+3] = alpha;
+                        }
+                    }
+                }
+            }
+        },
+    };
+
+    
+
+    const cartdata_el = document.getElementById("cartdata")!;
+    const encoded = cartdata_el.getAttribute("data-cart")!;
+    const encoded_len = Number(cartdata_el.getAttribute("data-cartlen")!)!;
+
+    const decoded_cart = decode(encoded, undefined);
+
+    const { instance } = await WebAssembly.instantiate(decoded_cart, imports);
+
+    // Expose the configure and update functions
+
+    awsm_console.memory = instance.exports.memory as WebAssembly.Memory;
+    awsm_console.exported_functions._configure = instance.exports.configure as Function;
+    awsm_console.exported_functions._update = instance.exports.update as Function;
    
     return awsm_console;
 }
@@ -408,11 +439,11 @@ export default async function run() {
 
     const awsm_console = await init();
 
-    const config_addr = awsm_console.exported_functions._configure();
+    const config_addr = awsm_console.exported_functions._configure!();
     await process_awsm_config(awsm_console, config_addr);
     
     setInterval(() => {
-        awsm_console.exported_functions._update();
+        awsm_console.exported_functions._update!();
         process_awsm_update(awsm_console);
     }, 1000 / 60);
     const canvas = document.getElementById('screen') as HTMLCanvasElement;

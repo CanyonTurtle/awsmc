@@ -94,31 +94,20 @@ AwsmConfig* configure(void) {
     return &awsm_config;
 }
 
-void draw_sprite(
-    uint8_t* framebuffer,
-    uint8_t* spritesheet,
+__attribute__((import_name("blit")))
+extern void blit(
+    uint8_t* src_addr,
     uint16_t sx,
     uint16_t sy,
-    uint16_t ss_stride,
-    int16_t x,
-    int16_t y,
-    uint16_t stride,
+    uint16_t s_stride,
+    uint8_t* dest_addr,
+    int16_t dx,
+    int16_t dy,
+    uint16_t d_stride,
     uint16_t w,
-    uint16_t h
-) {
-    for(uint32_t i = 0; i < h; i++) {
-        for(uint32_t j = 0; j < w; j++) {
-            uint8_t alpha = spritesheet[((sy+i)*ss_stride+(sx+j))*FRAMEBUFFER_BYPP+3];
-            if (alpha != 0) {
-                framebuffer[((y+i)*stride+(x+j))*FRAMEBUFFER_BYPP] = spritesheet[((sy+i)*ss_stride+(sx+j))*FRAMEBUFFER_BYPP];
-                framebuffer[((y+i)*stride+(x+j))*FRAMEBUFFER_BYPP+1] = spritesheet[((sy+i)*ss_stride+(sx+j))*FRAMEBUFFER_BYPP+1];
-                framebuffer[((y+i)*stride+(x+j))*FRAMEBUFFER_BYPP+2] = spritesheet[((sy+i)*ss_stride+(sx+j))*FRAMEBUFFER_BYPP+2];
-                framebuffer[((y+i)*stride+(x+j))*FRAMEBUFFER_BYPP+3] = alpha;
-            }
-
-        }
-    }
-}
+    uint16_t h,
+    char flags
+);
 
 
 
@@ -198,5 +187,5 @@ void update(void) {
     }
 
     
-    draw_sprite((uint8_t*)&framebuffer, (uint8_t*)&spritesheet, 0, 0, SPRITESHEET_WIDTH, SCREEN_WIDTH / 2 - SPRITESHEET_WIDTH / 2, SCREEN_HEIGHT / 2 - SPRITESHEET_HEIGHT / 2, SCREEN_WIDTH, SPRITESHEET_WIDTH, SPRITESHEET_HEIGHT);
+    blit((uint8_t*)&spritesheet, 0, 0, SPRITESHEET_WIDTH, (uint8_t*)&framebuffer, SCREEN_WIDTH / 2 - SPRITESHEET_WIDTH / 2, SCREEN_HEIGHT / 2 - SPRITESHEET_HEIGHT / 2, SCREEN_WIDTH, SPRITESHEET_WIDTH, SPRITESHEET_HEIGHT, 0);
 }
