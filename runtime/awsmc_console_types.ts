@@ -6,6 +6,11 @@
  * to see specific detail.
  */
 
+export const FRAMEBUFFER_BYPP = 4;
+
+/** Maximum number of supported clients connected at once. */
+export const N_CLIENTS = 4;
+
 /**
  * These configurations are set FROM the .wasm game and go TO the runtime, as 
  * set by the .wasm game's `configure()` function.
@@ -33,21 +38,41 @@ export type AwsmConfig = {
     /** Num. pixels in the virtual console's width. u16. */
     logical_height_px: number,
 
-
     /** The number of players that can play in the game. u16. */
     max_n_players: number,
-
 };
 
+/** Game stores up to 10 touches at a time. */
+export const TOUCHES_COUNT = 10; 
+
+/** 2 bytes for X, 2 bytes for Y, 2 bytes for generation */
+export const TOUCH_STRUCT_SIZE = 6; 
+
+/** The keys that are passed through. LRUD is the arrow keys. " " is the space, and 1 is digit 1.*/
+export const KEYS_VALUES = "LRUDabcdefghijklmnopqrstuvwxyz 1"
+
+/** Each digit shows 1 for pressed, 0 for not. "LRUDabcdefghijklmnopqrstuvwxyz 1" */
+export const KEYS_INPUT_SIZE = 4; 
+
+/** size of one client's input. */
+export const CLIENT_INPUT_SIZE = TOUCHES_COUNT * TOUCH_STRUCT_SIZE + KEYS_INPUT_SIZE; 
+
+
+/** size of all the inputs. */
+export const ALL_INPUTS_SIZE = CLIENT_INPUT_SIZE * N_CLIENTS; 
+
 /**
- * The input of one player. Includes their touchscreen touches and keyboard presses.
+ * The input of one client (e.g. your browser, or someone else's phone). Includes their touchscreen touches and keyboard presses.
  */
-export type PlayerInput = {
+export type ClientInput = {
 
-    /** The keyboard touches of this player. Maps a touch ID to (touch x u16, touch y u16, generation u16.) */
-    active_touches: Map<number, [number, number, number]>
+    /** 
+     * Touches. The index of the touch runs from 0 to TOUCHES_COUNT 
+     * and each index stores (touch x u16, touch y u16, generation u16.) 
+     */
+    touches: [number, number, number][]
 
-    /** Packed uint of each keyboard key as a 1 or a 0. left,right,up,down at positions 0123. */
+    /** Packed u32 of each keyboard key as a 1 or a 0. left,right,up,down at positions 0123. */
     keys_input: number,
 };
 
@@ -57,17 +82,17 @@ export type PlayerInput = {
  */
 export type AwsmInfo = {
 
-    /** Width in pixels of the physical computer/phone/console. */
+    /** u32 Width in pixels of the physical computer/phone/console. */
     device_width: number,
 
-    /** Height in pixels of the physical computer/phone/console. */
+    /** u32 Height in pixels of the physical computer/phone/console. */
     device_height: number,
 
-    /** The index of this client's player, zero being player 1, etc... */
-    netplay_player_number: number,
+    /** u16 The index of this client's, 0 being player 1, 1 being player 2,  etc... */
+    netplay_client_number: number,
 
     /**
-     * This generation is incremented each frame, so that touches can stale without overwriting zeros.
+     * u16 This generation is incremented each frame, so that touches can stale without overwriting zeros.
      */
     touch_generation: number,
 
@@ -75,7 +100,7 @@ export type AwsmInfo = {
      * The touches being pressed by the user. This will be loaded into the designated inputs buffer, TAKING INTO CONSIDERATION
      * which player # this client is (e.g. if player 2, these touches will be synced with the 2nd position in the input buffer).
      */
-    player_inputs: Array<PlayerInput>,
+    inputs: Array<ClientInput>,
 };
 
 /** The functions the .wasm module is expected to define, that this runtime will call. */
@@ -128,6 +153,9 @@ export type AwsmConsole = {
     exported_functions: AwsmExportedFunctions,
 
     /** Functions provided to the .wasm module from this runtime. */
-    provided_builtins: AwsmBuiltinFunctions
+    provided_builtins: AwsmBuiltinFunctions,
 
+    _runtime_state: {
+        active_touches: Map<number, [number, number, number]>
+    }
 };

@@ -1,4 +1,4 @@
-import type {AwsmConsole} from "./awsmc_console_types.ts"
+import {ALL_INPUTS_SIZE, CLIENT_INPUT_SIZE, FRAMEBUFFER_BYPP, KEYS_VALUES, TOUCHES_COUNT, TOUCH_STRUCT_SIZE, type AwsmConsole} from "./awsmc_console_types.ts"
 
 // import cart from "../build/cart.wasm"
 import {decode} from "./base64.ts"
@@ -24,15 +24,14 @@ const fragmentShaderSource = `
     }
 `;
 
+
 var filterStrength: number = 20;
 var frameTime: number = 0;
 var lastLoop: Date = new Date();
 var thisLoop: Date = new Date();
 
 
-const FRAMEBUFFER_BYPP = 4;
-const TOUCHES_COUNT = 10;
-const TOUCH_STRUCT_SIZE = 6; // 2 bytes for X, 2 bytes for Y, 2 bytes for generation
+
 
 export function requestFullscreen () {
     if (document.fullscreenElement == null) {
@@ -64,16 +63,17 @@ export function requestFullscreen () {
 
 
 
-function update_touch_ringbuffer(awsm_console: AwsmConsole) {
+function update_this_client_input(awsm_console: AwsmConsole) {
     let memory = awsm_console.memory;
-    awsm_console.buffers.inputs = new Uint8Array(memory!.buffer, awsm_console.config.info_addr, TOUCHES_COUNT * TOUCH_STRUCT_SIZE);
+    awsm_console.buffers.inputs = new Uint8Array(memory!.buffer, awsm_console.config.info_addr + 12, ALL_INPUTS_SIZE);
     const ips = awsm_console.buffers.inputs;
     ips.fill(0);
+
     let idx = 0;
-    for (const [_, value] of awsm_console.info.player_inputs[0].active_touches.entries()) {
+    for (const [_, value] of awsm_console._runtime_state.active_touches.entries()) {
         // Store touch information in the ring buffer
         let [screenX, screenY, generation] = value;
-        const touchIndex = idx * TOUCH_STRUCT_SIZE;
+        const touchIndex = CLIENT_INPUT_SIZE * awsm_console.info.netplay_client_number + idx * TOUCH_STRUCT_SIZE;
         ips[touchIndex + 1] = (screenX >> 8) & 0xff;
         ips[touchIndex + 0] = screenX;
         ips[touchIndex + 3] = (screenY >> 8) & 0xff;
@@ -81,12 +81,19 @@ function update_touch_ringbuffer(awsm_console: AwsmConsole) {
         ips[touchIndex + 5] = (generation >> 8) & 0xff;
         ips[touchIndex + 4] = generation;
 
+        console.log(touchIndex);
+
         // nextTouchIndex = (nextTouchIndex + 1) % TOUCHES_COUNT;
         idx += 1;
     }
 
+    const keys_buffer = new Uint16Array(memory!.buffer, awsm_console.config.info_addr + 12 + CLIENT_INPUT_SIZE * awsm_console.info.netplay_client_number + TOUCHES_COUNT * TOUCH_STRUCT_SIZE, 2);
+    const ki = awsm_console.info.inputs[awsm_console.info.netplay_client_number].keys_input;
+    keys_buffer[1] = (ki >> 16) & 0xffff;
+    keys_buffer[0] = ki;
+
     awsm_console.info.touch_generation += 1;
-    
+
 }
 
 /**
@@ -96,7 +103,7 @@ function update_touch_ringbuffer(awsm_console: AwsmConsole) {
 function bind_input_handlers(awsm_console: AwsmConsole) {
     
     let mousedown = false;
-    awsm_console.info.player_inputs[0].active_touches = new Map();
+    awsm_console._runtime_state.active_touches = new Map();
     awsm_console.info.touch_generation = 0;
 
     function handleTouchEvent(event: TouchEvent, removing: boolean) {
@@ -127,7 +134,7 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
     function addTouch(id: number, removing: boolean, x: number, y: number) {
         
         if (removing) {
-            awsm_console.info.player_inputs[0].active_touches.delete(id);
+            awsm_console._runtime_state.active_touches.delete(id);
             return;
         }   
 
@@ -143,12 +150,12 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
     
         // If the touch events were oob, delete them.
         if (screenX < 0 || screenX >= canvas.width || screenY < 0 || screenY >= canvas.height) {
-            awsm_console.info.player_inputs[0].active_touches.delete(id);
+            awsm_console._runtime_state.active_touches.delete(id);
             return;
         }
   
         // This will either update existing touches or add new ones, which will preserve the ordering.
-        awsm_console.info.player_inputs[0].active_touches.set(id, [screenX, screenY, awsm_console.info.touch_generation])
+        awsm_console._runtime_state.active_touches.set(id, [screenX, screenY, awsm_console.info.touch_generation])
 
     }
 
@@ -159,13 +166,55 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
     const handle_mousedown = (e: MouseEvent) => {mousedown = true; handleMouseEvent(e, false);};
     const handle_mouseup = (e: MouseEvent) => {mousedown = false; handleMouseEvent(e, true);};
 
+    const special_keymaps: Map<string, number> = new Map([
+        ["Space", 30],
+        ["ArrowLeft", 0],
+        ["ArrowRight", 1],
+        ["ArrowUp", 2],
+        ["ArrowDown", 3],
+        ["Digit1", 31],
+    ])
+
+    const get_key_idx = (e: KeyboardEvent) => {
+        let key_idx: number;
+        if (e.isComposing) {
+            return undefined;
+        }
+        if (e.code.startsWith("Key")) {
+            const letter = e.code[3].toLowerCase();
+            key_idx = KEYS_VALUES.indexOf(letter); 
+        } else if (special_keymaps.has(e.code)) {
+            key_idx = special_keymaps.get(e.code)!;
+        } else {
+            return undefined;
+        }
+        
+        return key_idx;
+    }
+
+
+    const handle_keydown = (e: KeyboardEvent) => {
+        const key_idx = get_key_idx(e);
+        if (key_idx !== undefined) {
+            awsm_console.info.inputs[awsm_console.info.netplay_client_number].keys_input |= 0x1 << (31 - key_idx);
+        }
+        console.log(awsm_console.info.inputs[awsm_console.info.netplay_client_number].keys_input.toString(2))
+    };
+
+    const handle_keyup = (e: KeyboardEvent) => {
+        const key_idx = get_key_idx(e);
+        if (key_idx !== undefined) {
+            awsm_console.info.inputs[awsm_console.info.netplay_client_number].keys_input &= ~(0x1 << (31 - key_idx));
+        }
+    }
+
     // Attach touch event listeners
 
-    const screen_el = document.getElementById("screen")!;
+    // const screen_el = document.getElementById("screen")!;
 
     const rebind_listener = (ltype: string, func: EventListener)  => {
-        screen_el.removeEventListener(ltype, func);
-        screen_el.addEventListener(ltype, func, {passive: false});
+        window.removeEventListener(ltype, func);
+        window.addEventListener(ltype, func, {passive: false});
     };
 
     for (const [ltype, func] of [
@@ -176,6 +225,8 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
         ['mousemove', handle_mousemove],
         ['mousedown', handle_mousedown],
         ['mouseup', handle_mouseup],
+        ['keydown', handle_keydown],
+        ['keyup', handle_keyup],
     ]) {
         rebind_listener((<string>ltype), (<EventListener>func));
     }
@@ -306,7 +357,7 @@ export async function process_awsm_config(awsm_console: AwsmConsole, config_addr
 
 export function process_awsm_update(awsm_console: AwsmConsole) {
 
-    update_touch_ringbuffer(awsm_console);
+    update_this_client_input(awsm_console);
 
     // calculate fps timing
     thisLoop = new Date();
@@ -346,10 +397,10 @@ export async function init(): Promise<AwsmConsole> {
         info: {
             device_width: 64,
             device_height: 64,
-            netplay_player_number: 0,
-            player_inputs: [
+            netplay_client_number: 0,
+            inputs: [
                 {
-                    active_touches: new Map(),
+                    touches: [],
                     keys_input: 0,
                 },
             ],
@@ -359,7 +410,10 @@ export async function init(): Promise<AwsmConsole> {
             _configure: undefined,
             _update: undefined,
         },
-        provided_builtins: {}
+        provided_builtins: {},
+        _runtime_state: {
+            active_touches: new Map()
+        }
     };
 
     // No need to set maximum memory; allow growth.

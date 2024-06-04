@@ -1,0 +1,11 @@
+{
+    "C_Cpp.default.intelliSenseMode": "",
+    "files.associations": {
+        "stdlib.h": "c",
+        "cstdint": "c",
+        "__availability": "c",
+        "__config": "c",
+        "typeinfo": "c",
+        "*.inc": "c"
+    }
+}
