@@ -33,7 +33,7 @@ cd awsmc
 bun install
 
 # Compile the game to a WASM file
-emcc src/breakout/breakout.c -o build/cart.wasm -sEXPORTED_FUNCTIONS=_configure,_update -sIMPORTED_FUNCTIONS=blit -sSTACK_SIZE=8mb -Oz --no-entry -Wl,--stack-first
+emcc src/breakout/breakout.c -o build/cart.wasm -I src -s EXPORTED_FUNCTIONS="['_configure', '_update']" -s STACK_SIZE=8mb -Oz --no-entry -Wl,--stack-first
 
 # Bundle the WASM file & spritesheet into a playable HTML file.
 bun run awsmc.ts bundle build/cart.wasm build/index.html src/breakout/breakout.png

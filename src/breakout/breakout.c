@@ -2,50 +2,31 @@
 #include <stdlib.h>
 #include <math.h>
 
-// Please read "awsmc_console_types.ts". That explains how the console works, and will help
-// make `configure()` and `update()` make more sense.
+#include "awsmc.h"
 
-// The framebuffer is 4 bytes per pixel - r, g, b, A.
-#define FRAMEBUFFER_BYPP 4
-
-// You can decide these!
+// You can decide the aspect ratio of your screen!
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 192
-#define BUTTON_SIZE 15
 
-// You can also decide where the framebuffer should be.
-// Make sure it doesn't overlap other important regions of memory.
-uint8_t framebuffer[SCREEN_WIDTH*SCREEN_HEIGHT*FRAMEBUFFER_BYPP];
-
+// (optional) you can make any .png into a spritesheet that gets bundled into the game, see the bundle command.
 #define SPRITESHEET_WIDTH 128
 #define SPRITESHEET_HEIGHT 128
 
-// You can decide if and where the spritesheet should be.
+// ----------- awsmc REQUIRED memory items --------------------
+// ----- You can decide where these awsmc-required sections of memory should live in your program. ----------
+// ----- After that, you can make your game through the API, or directly modify memory for your console. ----
+
+// (required by awsmc) the memory for the RGBA framebuffer.
+uint8_t framebuffer[SCREEN_WIDTH*SCREEN_HEIGHT*FRAMEBUFFER_BYPP];
+
+/** (required by awsmc) the memory where console runtime information will be placed. */
+volatile AwsmInfo awsm_info;
+
+/** (required by awsmc) the memeoy where your settings for the console will live. */
+AwsmConfig awsm_config;
+
+/** (Optional, supported by awsmc) the RGBA spritesheet framebuffer. */
 uint8_t spritesheet[SPRITESHEET_WIDTH*SPRITESHEET_HEIGHT*FRAMEBUFFER_BYPP];
-
-typedef struct {
-    uint16_t x;
-    uint16_t y;
-    uint16_t generation;
-} Touch;
-
-#define TOUCH_BUFFER_SIZE 10
-#define N_CLIENTS 10
-
-typedef struct {
-    Touch touches[TOUCH_BUFFER_SIZE];
-    uint32_t keys;
-} ClientInput;
-
-typedef struct {
-    uint32_t device_width;
-    uint32_t device_height;
-    uint16_t netplay_client_number;
-    uint16_t touch_generation;
-    ClientInput inputs[N_CLIENTS];
-} AwsmInfo;
-
-AwsmInfo awsm_info;
 
 typedef struct {
     float x;
@@ -66,19 +47,6 @@ GameState game_state = {
         .vy = 0.0,
     },
 };
-
-// This is the configuration that will be sent to the runtime from here.
-typedef struct {
-    uint32_t* framebuffer_addr;
-    uint32_t* info_addr;
-    uint32_t* spritesheet_addr;
-    uint16_t logical_width_px;
-    uint16_t logical_height_px;
-    uint16_t max_n_players;
-} AwsmConfig;
-
-AwsmConfig awsm_config;
-
 
 // Helper for drawing rectangles.
 void rect_unchecked(uint8_t* framebuffer, uint16_t sx, const uint16_t sy, const uint16_t ex, const uint16_t ey, const uint8_t color[4]) {
@@ -119,7 +87,7 @@ AwsmConfig* configure(void) {
     return &awsm_config;
 }
 
-//__attribute__((import_name("blit")))
+__attribute__((import_name("blit")))
 extern void blit(
     uint8_t* src_addr,
     uint16_t sx,
@@ -170,9 +138,9 @@ void update(void) {
     const uint16_t PADDLE_WIDTH = 22;
     const uint32_t KEY_LEFT = 0x80000000;
     const uint32_t KEY_RIGHT = 0x40000000;
-    const float ax = 1.6;
-    const float dragx = 0.7;
-    const float vmaxx = 2.0;
+    const float ax = 1.0;
+    const float dragx = 0.8;
+    const float vmaxx = 3.0;
     if (awsm_info.inputs[awsm_info.netplay_client_number].keys & KEY_LEFT) {
         game_state.player.vx -= ax;
     } else if (awsm_info.inputs[awsm_info.netplay_client_number].keys & KEY_RIGHT) {
