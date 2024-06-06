@@ -112,6 +112,7 @@ extern void blit(
 
 
 // This function is expected to be in the .wasm to update the screen, etc...
+
 void update(void) {
     game_state.timer += 1;
     // Your game logic here

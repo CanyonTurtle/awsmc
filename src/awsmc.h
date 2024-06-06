@@ -46,4 +46,33 @@ typedef struct {
     uint16_t max_n_players;
 } AwsmConfig;
 
+__attribute__((import_name("blit")))
+extern void blit(
+    uint8_t* src_addr,
+    uint16_t sx,
+    uint16_t sy,
+    uint16_t s_stride,
+    uint8_t* dest_addr,
+    int16_t dx,
+    int16_t dy,
+    uint16_t d_stride,
+    uint16_t w,
+    uint16_t h,
+    char flags
+);
+
+__attribute__((import_name("draw_ss")))
+extern void draw_ss(
+    uint16_t sx,
+    uint16_t sy,
+    int16_t dx,
+    int16_t dy,
+    uint16_t w,
+    uint16_t h,
+    char flags
+);
+
+__attribute__((import_name("fill_screen")))
+extern void fill_screen(uint32_t color);
+
 #endif

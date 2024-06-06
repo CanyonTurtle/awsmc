@@ -281,6 +281,8 @@ export async function process_awsm_config(awsm_console: AwsmConsole, config_addr
         // Copy the spritesheet into the console's memory at the spritesheet address
         awsm_console.buffers.spritesheet_buffer = new Uint8Array(memory!.buffer, awsm_console.config.spritesheet_addr, ss_img.width * ss_img.height * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
         awsm_console.buffers.spritesheet_buffer.set(ss_bytes);
+
+        awsm_console._runtime_state.spritesheet_info = {width: ss_img.width, height: ss_img.height};
     }
 
 
@@ -412,59 +414,82 @@ export async function init(): Promise<AwsmConsole> {
         },
         provided_builtins: {},
         _runtime_state: {
-            active_touches: new Map()
+            active_touches: new Map(),
+            spritesheet_info: undefined,
         }
     };
+
+    // some quick helpers for implementing the game API.
+
+    function blit(
+        src_addr: number,
+        sx: number,
+        sy: number,
+        s_stride: number,
+        dest_addr: number,
+        dx: number,
+        dy: number,
+        d_stride: number,
+        w: number,
+        h: number,
+        flags: number,  
+    ) {
+        // grab framebuffer. 
+        // We try to reuse our buffer object 
+        // if it's just the usual framebuffer.
+        let dest_buffer;
+        if (dest_addr === awsm_console.config.framebuffer_addr) {
+            dest_buffer = awsm_console.buffers.framebuffer!;
+        } else {
+            dest_buffer = new Uint8Array(awsm_console.memory!.buffer, dest_addr);
+        }
+
+        // grab spritesheet. We try to reuse our spritesheet object
+        // if it's just the usual spritesheet.
+        let src_buffer;
+        if (src_addr === awsm_console.config.spritesheet_addr) {
+            src_buffer = awsm_console.buffers.spritesheet_buffer!;
+        } else {
+            src_buffer = new Uint8Array(awsm_console.memory!.buffer, src_addr);
+        }
+        
+        for (let i = 0; i < h; i++){
+            for (let j = 0; j < w; j++) {
+                let alpha: number = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP+3];
+                if (alpha !== 0) {
+                    dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP] = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP];
+                    dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP+1] = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP+1];
+                    dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP+2] = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP+2];
+                    dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP+3] = alpha;
+                }
+            }
+        }
+    }
+
+    function draw_ss(sx: number, sy: number, dx: number, dy: number, w: number, h: number, flags: number) {
+        if (awsm_console._runtime_state.spritesheet_info !== undefined) {
+            blit(
+                awsm_console.buffers.spritesheet_buffer!.byteOffset,
+                sx, sy, awsm_console.config.logical_width_px,
+                awsm_console.buffers.framebuffer!.byteOffset,
+                dx, dy, awsm_console._runtime_state.spritesheet_info.width,
+                w, h, flags
+            )
+        }
+    }
+
+    function fill_screen(color: number) {
+        new Uint32Array(awsm_console.buffers.framebuffer!.buffer, awsm_console.buffers.framebuffer!.byteOffset, awsm_console.buffers.framebuffer!.length / 4).fill(color);
+    }
 
     // No need to set maximum memory; allow growth.
     // const memory = new WebAssembly.Memory({ initial: 1024, maximum: 1024});
     const imports = {
         env: {
             // memory,
-            blit(
-                src_addr: number,
-                sx: number,
-                sy: number,
-                s_stride: number,
-                dest_addr: number,
-                dx: number,
-                dy: number,
-                d_stride: number,
-                w: number,
-                h: number,
-                flags: number,  
-            ) {
-                // grab framebuffer. 
-                // We try to reuse our buffer object 
-                // if it's just the usual framebuffer.
-                let dest_buffer;
-                if (dest_addr === awsm_console.config.framebuffer_addr) {
-                    dest_buffer = awsm_console.buffers.framebuffer!;
-                } else {
-                    dest_buffer = new Uint8Array(awsm_console.memory!.buffer, dest_addr);
-                }
-
-                // grab spritesheet. We try to reuse our spritesheet object
-                // if it's just the usual spritesheet.
-                let src_buffer;
-                if (src_addr === awsm_console.config.spritesheet_addr) {
-                    src_buffer = awsm_console.buffers.spritesheet_buffer!;
-                } else {
-                    src_buffer = new Uint8Array(awsm_console.memory!.buffer, src_addr);
-                }
-                
-                for (let i = 0; i < h; i++){
-                    for (let j = 0; j < w; j++) {
-                        let alpha: number = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP+3];
-                        if (alpha !== 0) {
-                            dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP] = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP];
-                            dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP+1] = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP+1];
-                            dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP+2] = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP+2];
-                            dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP+3] = alpha;
-                        }
-                    }
-                }
-            }
+            blit,
+            draw_ss, 
+            fill_screen,
         },
     };
 

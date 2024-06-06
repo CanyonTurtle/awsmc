@@ -156,6 +156,11 @@ export type AwsmConsole = {
     provided_builtins: AwsmBuiltinFunctions,
 
     _runtime_state: {
-        active_touches: Map<number, [number, number, number]>
+
+        /** The touches on this client. */
+        active_touches: Map<number, [number, number, number]>,
+
+        /** Either the width and height of the spritesheet, or nothing. */
+        spritesheet_info: {width: number, height: number} | undefined,
     }
 };

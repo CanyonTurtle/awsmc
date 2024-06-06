@@ -28,15 +28,28 @@ AwsmConfig awsm_config;
 /** (Optional, supported by awsmc) the RGBA spritesheet framebuffer. */
 uint8_t spritesheet[SPRITESHEET_WIDTH*SPRITESHEET_HEIGHT*FRAMEBUFFER_BYPP];
 
+typedef enum PaddleMovement {
+    PADDLE_LEFT,
+    PADDLE_RIGHT,
+    PADDLE_NO_MOVE,
+} PaddleMovement;
+
 typedef struct {
     float x;
     float y;
     float vx;
     float vy;
+    PaddleMovement paddle_movement;
 } Player;
+
+typedef enum InputMode {
+    KEYBOARD,
+    TOUCH,
+} InputMode;
 
 typedef struct {
     Player player;
+    InputMode input_mode;
 } GameState;
 
 GameState game_state = {
@@ -46,6 +59,7 @@ GameState game_state = {
         .vx = 0.0,
         .vy = 0.0,
     },
+    KEYBOARD,
 };
 
 // Helper for drawing rectangles.
@@ -87,21 +101,6 @@ AwsmConfig* configure(void) {
     return &awsm_config;
 }
 
-__attribute__((import_name("blit")))
-extern void blit(
-    uint8_t* src_addr,
-    uint16_t sx,
-    uint16_t sy,
-    uint16_t s_stride,
-    uint8_t* dest_addr,
-    int16_t dx,
-    int16_t dy,
-    uint16_t d_stride,
-    uint16_t w,
-    uint16_t h,
-    char flags
-);
-
 float clamp_float(float value, float min, float max) {
     if (value <= min) {
         return min;
@@ -129,28 +128,47 @@ void update(void) {
 
         // Use touch data as needed
         if (x != 0 && y != 0 && generation) {
-            
+            game_state.player.paddle_movement = (x < SCREEN_WIDTH / 2) ? PADDLE_LEFT : PADDLE_RIGHT;
+            game_state.input_mode = TOUCH;
+            any = 1;
         }
 
+    }
+    if (!any && game_state.input_mode == TOUCH) {
+        game_state.player.paddle_movement = PADDLE_NO_MOVE;
     }
 
     // handle paddle input
     const uint16_t PADDLE_WIDTH = 22;
+    const uint16_t PADDLE_HEIGHT = 7;
     const uint32_t KEY_LEFT = 0x80000000;
     const uint32_t KEY_RIGHT = 0x40000000;
-    const float ax = 1.0;
+    const float ax = 2.0;
     const float dragx = 0.8;
     const float vmaxx = 3.0;
     if (awsm_info.inputs[awsm_info.netplay_client_number].keys & KEY_LEFT) {
-        game_state.player.vx -= ax;
+        game_state.player.paddle_movement = PADDLE_LEFT;
     } else if (awsm_info.inputs[awsm_info.netplay_client_number].keys & KEY_RIGHT) {
+        game_state.player.paddle_movement = PADDLE_RIGHT;
+    } else if (game_state.input_mode == KEYBOARD) {
+        game_state.player.paddle_movement = PADDLE_NO_MOVE;
+    }
+
+    if (game_state.player.paddle_movement == PADDLE_LEFT) {
+        game_state.player.vx -= ax;
+    } else if (game_state.player.paddle_movement == PADDLE_RIGHT) {
         game_state.player.vx += ax;
     }
+
     game_state.player.vx *= dragx;
     game_state.player.vx = clamp_float(game_state.player.vx, -vmaxx, vmaxx);
     game_state.player.x += game_state.player.vx;
     game_state.player.x = clamp_float(game_state.player.x, 0.0, (float)(SCREEN_WIDTH - PADDLE_WIDTH));
 
+    // clear screen
+    const uint32_t BG_COLOR = 0x67a3c000;
+    fill_screen(BG_COLOR);
     // draw paddle
-    blit((uint8_t*)&spritesheet, 0, 8, SPRITESHEET_WIDTH, (uint8_t*)&framebuffer, (uint16_t) game_state.player.x, game_state.player.y, SCREEN_WIDTH, PADDLE_WIDTH, 7, 0);
+    draw_ss(0, 8, game_state.player.x, game_state.player.y, PADDLE_WIDTH, PADDLE_HEIGHT, 0);
+
 }
