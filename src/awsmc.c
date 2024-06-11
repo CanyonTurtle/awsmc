@@ -1,12 +1,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
+#include <awsmc.h>
 
 // Please read "awsmc_console_types.ts". That explains how the console works, and will help
 // make `configure()` and `update()` make more sense.
 
-// The framebuffer is 4 bytes per pixel - r, g, b, A.
-#define FRAMEBUFFER_BYPP 4
 
 // You can decide these!
 #define SCREEN_WIDTH 128
@@ -23,12 +22,6 @@ uint8_t framebuffer[SCREEN_WIDTH*SCREEN_HEIGHT*FRAMEBUFFER_BYPP];
 // You can decide if and where the spritesheet should be.
 uint8_t spritesheet[SPRITESHEET_WIDTH*SPRITESHEET_HEIGHT*FRAMEBUFFER_BYPP];
 
-typedef struct {
-    uint16_t x;
-    uint16_t y;
-    uint16_t generation;
-} Touch;
-
 #define TOUCH_BUFFER_SIZE 10
 Touch touch_buffer[TOUCH_BUFFER_SIZE];
 
@@ -41,16 +34,6 @@ GameState game_state = {
     .timer = 0,
     .just_touched = 0,
 };
-
-// This is the configuration that will be sent to the runtime from here.
-typedef struct {
-    uint32_t* framebuffer_addr;
-    uint32_t* info_addr;
-    uint32_t* spritesheet_addr;
-    uint16_t logical_width_px;
-    uint16_t logical_height_px;
-    uint16_t max_n_players;
-} AwsmConfig;
 
 AwsmConfig awsm_config;
 
@@ -94,23 +77,6 @@ AwsmConfig* configure(void) {
     return &awsm_config;
 }
 
-__attribute__((import_name("blit")))
-extern void blit(
-    uint8_t* src_addr,
-    uint16_t sx,
-    uint16_t sy,
-    uint16_t s_stride,
-    uint8_t* dest_addr,
-    int16_t dx,
-    int16_t dy,
-    uint16_t d_stride,
-    uint16_t w,
-    uint16_t h,
-    char flags
-);
-
-
-
 // This function is expected to be in the .wasm to update the screen, etc...
 
 void update(void) {
@@ -150,7 +116,13 @@ void update(void) {
             }
             xx = x - BUTTON_SIZE / 2;
             yy = y - BUTTON_SIZE / 2;
-            rect(framebuffer, xx, yy,BUTTON_SIZE,BUTTON_SIZE, rc);
+            uint32_t c = (
+                ((rc[0] << 24) & 0xff000000) |
+                ((rc[1] << 16) & 0xff0000) |
+                ((rc[2] << 8) & 0xff00) |
+                ((rc[3]) & 0xff)
+            );
+            fill(xx, yy,BUTTON_SIZE,BUTTON_SIZE, c);
         }
 
     }
@@ -166,7 +138,13 @@ void update(void) {
             framebuffer[i * 4 + 2] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i*5, 0.99)/10 + game_state.timer) % 220)); // B
             framebuffer[i * 4 + 3] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i, 1.1) + (uint32_t)pow(game_state.timer, 0.9))%190) + 10);    // A
         }
-        rect(framebuffer, xx, yy,BUTTON_SIZE,BUTTON_SIZE, rc);
+        uint32_t c = (
+            ((rc[0] << 24) & 0xff000000) |
+            ((rc[1] << 16) & 0xff0000) |
+            ((rc[2] << 8) & 0xff00) |
+            ((rc[3]) & 0xff)
+        );
+        fill(xx, yy,BUTTON_SIZE,BUTTON_SIZE, c);
     }
 
     float blur_rate = 0.2535;

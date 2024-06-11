@@ -162,5 +162,8 @@ export type AwsmConsole = {
 
         /** Either the width and height of the spritesheet, or nothing. */
         spritesheet_info: {width: number, height: number} | undefined,
+
+        /** Check byte alignment of platform, in case we need to rearrange some color applications. */
+        is_little_endian: boolean,
     }
 };

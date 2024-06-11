@@ -33,7 +33,7 @@ var thisLoop: Date = new Date();
 
 
 
-export function requestFullscreen () {
+export function toggleFullscreen () {
     if (document.fullscreenElement == null) {
         function expandIframe () {
             // Fullscreen failed, try to maximize our own iframe. We don't yet have a button to go
@@ -56,6 +56,8 @@ export function requestFullscreen () {
         } else {
             expandIframe();
         }
+    } else {
+        document.exitFullscreen();
     }
 }
 
@@ -80,8 +82,6 @@ function update_this_client_input(awsm_console: AwsmConsole) {
         ips[touchIndex + 2] = screenY;
         ips[touchIndex + 5] = (generation >> 8) & 0xff;
         ips[touchIndex + 4] = generation;
-
-        console.log(touchIndex);
 
         // nextTouchIndex = (nextTouchIndex + 1) % TOUCHES_COUNT;
         idx += 1;
@@ -198,7 +198,6 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
         if (key_idx !== undefined) {
             awsm_console.info.inputs[awsm_console.info.netplay_client_number].keys_input |= 0x1 << (31 - key_idx);
         }
-        console.log(awsm_console.info.inputs[awsm_console.info.netplay_client_number].keys_input.toString(2))
     };
 
     const handle_keyup = (e: KeyboardEvent) => {
@@ -210,30 +209,30 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
 
     // Attach touch event listeners
 
-    // const screen_el = document.getElementById("screen")!;
+    const screen_el = document.getElementById("screen")!;
 
-    const rebind_listener = (ltype: string, func: EventListener)  => {
-        window.removeEventListener(ltype, func);
-        window.addEventListener(ltype, func, {passive: false});
+    const rebind_listener = (listenee: HTMLElement, ltype: string, func: EventListener)  => {
+        listenee.removeEventListener(ltype, func);
+        listenee.addEventListener(ltype, func, {passive: false});
     };
 
-    for (const [ltype, func] of [
-        ['touchstart', touch_update],
-        ['touchmove', touch_update],
-        ['touchend', touch_delete],
-        ['touchcancel', touch_delete],
-        ['mousemove', handle_mousemove],
-        ['mousedown', handle_mousedown],
-        ['mouseup', handle_mouseup],
-        ['keydown', handle_keydown],
-        ['keyup', handle_keyup],
+    for (const [listenee, ltype, func] of [
+        [screen_el, 'touchstart', touch_update],
+        [screen_el, 'touchmove', touch_update],
+        [screen_el, 'touchend', touch_delete],
+        [screen_el, 'touchcancel', touch_delete],
+        [screen_el, 'mousemove', handle_mousemove],
+        [screen_el, 'mousedown', handle_mousedown],
+        [screen_el, 'mouseup', handle_mouseup],
+        [window, 'keydown', handle_keydown],
+        [window, 'keyup', handle_keyup],
     ]) {
-        rebind_listener((<string>ltype), (<EventListener>func));
+        rebind_listener(listenee as HTMLElement, (<string>ltype), (<EventListener>func));
     }
 
     document.getElementById("fullscreen-btn")!.addEventListener("click", (e: Event) => {
         e.preventDefault();
-        requestFullscreen();
+        toggleFullscreen();
     });
 }
 
@@ -253,7 +252,6 @@ export async function process_awsm_config(awsm_console: AwsmConsole, config_addr
         logical_height_px: cd[7],
         max_n_players: cd[8],
     };
-    console.log(awsm_console)
 
     // if the game author specified a spritesheet address, load the spritesheet into the console's memory
     if (awsm_console.config.spritesheet_addr != 0) {
@@ -380,6 +378,18 @@ export function process_awsm_update(awsm_console: AwsmConsole) {
 
 export async function init(): Promise<AwsmConsole> {
 
+
+    function check_is_little_endian() {
+        var arrayBuffer = new ArrayBuffer(2);
+        var uint8Array = new Uint8Array(arrayBuffer);
+        var uint16array = new Uint16Array(arrayBuffer);
+        uint8Array[0] = 0xAA; // set first byte
+        uint8Array[1] = 0xBB; // set second byte
+        if(uint16array[0] === 0xBBAA) return true;
+        if(uint16array[0] === 0xAABB) return false;
+        else throw new Error("Something crazy just happened");
+    }
+
     let awsm_console: AwsmConsole = {
         memory: undefined,
         buffers: {
@@ -416,6 +426,7 @@ export async function init(): Promise<AwsmConsole> {
         _runtime_state: {
             active_touches: new Map(),
             spritesheet_info: undefined,
+            is_little_endian: check_is_little_endian()
         }
     };
 
@@ -453,14 +464,23 @@ export async function init(): Promise<AwsmConsole> {
             src_buffer = new Uint8Array(awsm_console.memory!.buffer, src_addr);
         }
         
+        
+        const [startx, endx, stepx] = ((flags & 0x1) !== 0) ? [w, -1, -1] : [0, w, 1];
+        const [starty, endy, stepy] = ((flags & 0x10) !== 0) ? [h, -1, -1] : [0, h, 1];
+
+
         for (let i = 0; i < h; i++){
+            const di = ((flags & 0x10) === 0) ? i : h - 1 - i;
             for (let j = 0; j < w; j++) {
+                const dj = ((flags & 0x1) === 0) ? j : w - 1 - j;
                 let alpha: number = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP+3];
                 if (alpha !== 0) {
-                    dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP] = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP];
-                    dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP+1] = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP+1];
-                    dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP+2] = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP+2];
-                    dest_buffer[((dy+i)*d_stride+(dx+j))*FRAMEBUFFER_BYPP+3] = alpha;
+                    const fb_loc = ((dy+di)*d_stride+(dx+dj))*FRAMEBUFFER_BYPP;
+                    const ss_loc = ((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP;
+                    dest_buffer[fb_loc] = src_buffer[ss_loc];
+                    dest_buffer[fb_loc+1] = src_buffer[ss_loc+1];
+                    dest_buffer[fb_loc+2] = src_buffer[ss_loc+2];
+                    dest_buffer[fb_loc+3] = alpha;
                 }
             }
         }
@@ -470,16 +490,59 @@ export async function init(): Promise<AwsmConsole> {
         if (awsm_console._runtime_state.spritesheet_info !== undefined) {
             blit(
                 awsm_console.buffers.spritesheet_buffer!.byteOffset,
-                sx, sy, awsm_console.config.logical_width_px,
+                sx, sy, awsm_console._runtime_state.spritesheet_info.width,
                 awsm_console.buffers.framebuffer!.byteOffset,
-                dx, dy, awsm_console._runtime_state.spritesheet_info.width,
+                dx, dy, awsm_console.config.logical_width_px,
                 w, h, flags
             )
         }
     }
 
+    function _REV(num: number): number {
+        // Ensure the number is treated as a 32-bit unsigned integer
+        let result = ((num >>> 24) & 0xFF) | 
+                     ((num >>> 8) & 0xFF00) | 
+                     ((num << 8) & 0xFF0000) | 
+                     ((num << 24) & 0xFF000000);
+        return result >>> 0; // Convert to unsigned 32-bit integer
+    }
+
+    function _get_corrected_color(color: number) {
+        if (awsm_console._runtime_state.is_little_endian) {
+            return _REV(color)
+        }
+        return color
+    }
+
+
     function fill_screen(color: number) {
-        new Uint32Array(awsm_console.buffers.framebuffer!.buffer, awsm_console.buffers.framebuffer!.byteOffset, awsm_console.buffers.framebuffer!.length / 4).fill(color);
+        const corrected_color = _get_corrected_color(color)
+        new Uint32Array(awsm_console.buffers.framebuffer!.buffer, awsm_console.buffers.framebuffer!.byteOffset, awsm_console.buffers.framebuffer!.length / 4).fill(corrected_color);
+    }
+
+    /** Fast line filling function that uses the backed array helper. */
+    function _fast_hline_unchecked(sx: number, ex: number, y: number, corrected_color: number) {
+        new Uint32Array(
+            awsm_console.buffers.framebuffer!.buffer,
+            (
+                awsm_console.buffers.framebuffer!.byteOffset
+                + (y * awsm_console.config.logical_width_px) * 4
+                + sx * 4
+            ), 
+            (ex - sx),
+        ).fill(corrected_color);
+    }
+
+
+
+    function fill(x: number, y: number, w: number, h: number, color: number) {
+        const clamp = (v: number, minv: number, maxv: number) => Math.min(maxv, Math.max(minv, v))
+        const [sx, ex] = [x, x + w].map((v) => clamp(v, 0, awsm_console.config.logical_width_px));
+        const [sy, ey] = [y, y + h].map((v) => clamp(v, 0, awsm_console.config.logical_height_px));
+        const corrected_color = _get_corrected_color(color)
+        for (let i = sy; i < ey; i++) {
+            _fast_hline_unchecked(sx, ex, i, corrected_color);
+        }
     }
 
     // No need to set maximum memory; allow growth.
@@ -490,6 +553,7 @@ export async function init(): Promise<AwsmConsole> {
             blit,
             draw_ss, 
             fill_screen,
+            fill,
         },
     };
 
@@ -516,6 +580,7 @@ export async function init(): Promise<AwsmConsole> {
 
 export default async function run() {
 
+
     const awsm_console = await init();
 
     const config_addr = awsm_console.exported_functions._configure!();
@@ -534,7 +599,6 @@ export default async function run() {
     // canvas.height = canvasHeight; -->
 
     function resizeCanvas() {
-        // console.log("resized");
         // Get the current size of the canvas container
         const containerWidth = (<any>canvas.parentNode).clientWidth;
         const containerHeight = (<any>canvas.parentNode).clientHeight;
@@ -548,7 +612,6 @@ export default async function run() {
 
         // Determine the scale to fit the canvas while preserving aspect ratio
         let scale = Math.min(scaleWidth, scaleHeight);
-        // console.log(scale);
 
         // Calculate the new dimensions
         const newWidth = Math.floor(canvasWidth * scale);
@@ -570,3 +633,4 @@ export default async function run() {
         fpsOut.innerHTML = (1000/frameTime).toFixed(1) + " fps";
     },1000);
 }
+

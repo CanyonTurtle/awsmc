@@ -28,11 +28,92 @@ AwsmConfig awsm_config;
 /** (Optional, supported by awsmc) the RGBA spritesheet framebuffer. */
 uint8_t spritesheet[SPRITESHEET_WIDTH*SPRITESHEET_HEIGHT*FRAMEBUFFER_BYPP];
 
+
+
+// --------- GAME CODE -----------
 typedef enum PaddleMovement {
     PADDLE_LEFT,
     PADDLE_RIGHT,
     PADDLE_NO_MOVE,
 } PaddleMovement;
+
+typedef struct SpriteFrame {
+    uint16_t x;
+    uint16_t y; 
+    uint16_t w;
+    uint16_t h;
+    char flags;
+} SpriteFrame;
+
+typedef struct Sprite {
+    size_t n_frames;
+    SpriteFrame* sprite_frames;
+} Sprite;
+
+SpriteFrame paddle_frames[1] = {
+    {
+        .x = 0,
+        .y = 8,
+        .w = 22,
+        .h = 7,
+        .flags = 0,
+    },
+};
+
+Sprite paddle_sprite = {
+    .n_frames = 1,
+    .sprite_frames = paddle_frames,
+};
+
+SpriteFrame block_frames[1] = {
+    {
+        .x = 16,
+        .y = 0,
+        .w = 8,
+        .h = 8,
+        .flags = 0,
+    }
+};
+
+Sprite block_sprite = {
+   .n_frames = 1,
+   .sprite_frames = block_frames, 
+};
+
+SpriteFrame ball_frames[1] = {
+    {
+        .x = 24,
+        .y = 0,
+        .w = 8,
+        .h = 8,
+        .flags = 0,
+    },
+};
+
+Sprite ball_sprite = {
+    .n_frames = 1,
+    .sprite_frames = ball_frames,
+};
+
+SpriteFrame awsmc_frames[1] = {
+    {
+        .x = 0,
+        .y = 32,
+        .w = 89,
+        .h = 16,
+        .flags = 0,
+    },
+};
+
+Sprite awsmc_sprite = {
+    .n_frames = 1,
+    .sprite_frames = awsmc_frames,
+};
+
+void drawsprite(const Sprite* sprite, int16_t x, int16_t y, size_t frame_idx, char extra_flags) {
+    SpriteFrame* frame = &sprite->sprite_frames[frame_idx % sprite->n_frames];
+    draw_ss(frame->x, frame->y, x, y, frame->w, frame->h, frame->flags ^ extra_flags);
+}
 
 typedef struct {
     float x;
@@ -47,9 +128,18 @@ typedef enum InputMode {
     TOUCH,
 } InputMode;
 
+typedef struct Ball {
+    float x;
+    float y;
+    float vx;
+    float vy;
+} Ball;
+
 typedef struct {
     Player player;
     InputMode input_mode;
+    Ball ball;
+    uint32_t timer;
 } GameState;
 
 GameState game_state = {
@@ -60,29 +150,14 @@ GameState game_state = {
         .vy = 0.0,
     },
     KEYBOARD,
+    .ball = {
+        .x = (float) (SCREEN_WIDTH / 2),
+        .y = (float) (SCREEN_HEIGHT / 2),
+        .vx = 3.0,
+        .vy = 1.3,
+    },
+    .timer = 0,
 };
-
-// Helper for drawing rectangles.
-void rect_unchecked(uint8_t* framebuffer, uint16_t sx, const uint16_t sy, const uint16_t ex, const uint16_t ey, const uint8_t color[4]) {
-    for (int i = sy; i < ey; i++) {
-        for(int j = sx; j < ex; j++) {
-            framebuffer[(i*SCREEN_WIDTH+j) * 4] = color[0]; 
-            framebuffer[(i*SCREEN_WIDTH+j) * 4 + 1] = color[1]; 
-            framebuffer[(i*SCREEN_WIDTH+j) * 4 + 2] = color[2]; 
-            framebuffer[(i*SCREEN_WIDTH+j) * 4 + 3] = color[3]; 
-        }
-    }
-}
-
-// Helpers.
-#define MIN(a,b) (uint16_t)((((int16_t)a)<((int16_t)b))?((int16_t)a):((int16_t)b))
-#define MAX(a,b) (uint16_t)((((int16_t)a)>((int16_t)b))?((int16_t)a):((int16_t)b))
-
-// Helper for drawing rectangles, making sure they don't go out of bounds of the framebuffer.
-void rect(uint8_t* framebuffer, const int16_t sx, const int16_t sy, const uint16_t w, const uint16_t h, const uint8_t color[4]) {
-    rect_unchecked(framebuffer, MAX(sx, 0), MAX(sy, 0), MIN(sx+w, SCREEN_WIDTH-1), MIN(sy+h, SCREEN_HEIGHT-1), color);
-}
-
 
 // This function is expected to be here in the .wasm.
 // It must write the configuration settings.
@@ -114,10 +189,6 @@ float clamp_float(float value, float min, float max) {
 // This function is expected to be in the .wasm to update the screen, etc...
 void update(void) {
 
-    for(int i = 0; i < sizeof framebuffer; i++) {
-        framebuffer[i] = 0;
-    }
-
     // Access touch data from the buffer
     char any = 0;
     for (int i = 0; i < TOUCH_BUFFER_SIZE; i++) {
@@ -148,8 +219,10 @@ void update(void) {
     const float vmaxx = 3.0;
     if (awsm_info.inputs[awsm_info.netplay_client_number].keys & KEY_LEFT) {
         game_state.player.paddle_movement = PADDLE_LEFT;
+        game_state.input_mode = KEYBOARD;
     } else if (awsm_info.inputs[awsm_info.netplay_client_number].keys & KEY_RIGHT) {
         game_state.player.paddle_movement = PADDLE_RIGHT;
+        game_state.input_mode = KEYBOARD;
     } else if (game_state.input_mode == KEYBOARD) {
         game_state.player.paddle_movement = PADDLE_NO_MOVE;
     }
@@ -163,12 +236,108 @@ void update(void) {
     game_state.player.vx *= dragx;
     game_state.player.vx = clamp_float(game_state.player.vx, -vmaxx, vmaxx);
     game_state.player.x += game_state.player.vx;
-    game_state.player.x = clamp_float(game_state.player.x, 0.0, (float)(SCREEN_WIDTH - PADDLE_WIDTH));
+    game_state.player.x = clamp_float(game_state.player.x, 8.0, (float)(SCREEN_WIDTH - PADDLE_WIDTH - 8.0));
+
+    // move ball
+    if (game_state.ball.x < 8.0) {
+        game_state.ball.x = 8.0;
+        game_state.ball.vx *= (game_state.ball.vx < 0) ? -1.0 : 1.0;
+    }
+    const float BALL_RIGHT_SIDE = ((float)SCREEN_WIDTH) - 8.0 - 8.0 - 1.0;
+    if (game_state.ball.x > BALL_RIGHT_SIDE) {
+        game_state.ball.x = BALL_RIGHT_SIDE;
+        game_state.ball.vx *= (game_state.ball.vx < 0) ? 1.0 : -1.0;
+    }
+    if (game_state.ball.y < 8.0) {
+        game_state.ball.y = 8.0;
+        game_state.ball.vy *= (game_state.ball.vy < 0) ? -1.0 : 1.0;
+    }
+    const float BALL_BOTTOM_SIDE = ((float)SCREEN_HEIGHT) - 8.0 - 1.0;
+    if (game_state.ball.y > BALL_BOTTOM_SIDE) {
+        game_state.ball.y = BALL_BOTTOM_SIDE;
+        game_state.ball.vy *= (game_state.ball.vy < 0) ? 1.0 : -1.0;
+    }
+    game_state.ball.x += game_state.ball.vx;
+    game_state.ball.y += game_state.ball.vy;
+
+    // ball bouncing off paddle
+    if (
+        game_state.ball.x + (int16_t)ball_sprite.sprite_frames[0].w >= game_state.player.x 
+        && game_state.ball.x <= game_state.player.x + (int16_t)paddle_frames[0].w
+        && game_state.ball.y + (int16_t)ball_sprite.sprite_frames[0].h >= game_state.player.y
+        && game_state.ball.y <= game_state.player.y + (int16_t)paddle_frames[0].h
+    ) {
+        game_state.ball.vy *= (game_state.ball.vy < 0) ? 1.0 : -1.0;
+    }
 
     // clear screen
-    const uint32_t BG_COLOR = 0x67a3c000;
-    fill_screen(BG_COLOR);
+    const uint32_t BG_COLOR = 0xf6ffd4ff;
+    // fill_screen(BG_COLOR);
+
+    // draw rectangles
+    #define BUTTON_INLAY 10
+    #define BUTTON_PRESSED_COLOR 0x2ff6a7ff
+    #define BUTTON_UNPRESSED_COLOR 0x5d6d88ff
+    #define BUTTON_WIDTH 16
+    #define BUTTON_HEIGHT 16
+
+
+    game_state.timer += 1;
+    float blur_rate = 0.1;
+    float channel_rates[4] = {1.0f, 1.00f, 1.0f, 1.0f};
+    if (game_state.timer % 1 == 0) {
+        for (int kk = 0; kk < 2; kk++) {
+            for (uint32_t i = 0; i < SCREEN_HEIGHT; i++) {
+                for (uint32_t j = 0; j < SCREEN_WIDTH; j++) {
+                    for (uint32_t offs = 0; offs < 4; offs++) {
+                        framebuffer[(i*SCREEN_WIDTH+j)*4+offs] = (
+                            (uint8_t)((1.0f - 4.0f*blur_rate*channel_rates[offs])*(float)framebuffer[(i*SCREEN_WIDTH+j)*4+offs])
+                            + (uint8_t)(blur_rate*channel_rates[offs]*(float)framebuffer[(((i-1)%SCREEN_HEIGHT)*SCREEN_WIDTH+j)*4+offs])
+                            + (uint8_t)(blur_rate*channel_rates[offs]*(float)framebuffer[(((i+1)%SCREEN_HEIGHT)*SCREEN_WIDTH+j)*4+offs])
+                            + (uint8_t)(blur_rate*channel_rates[offs]*(float)framebuffer[((i)*SCREEN_WIDTH+(j+1)%SCREEN_WIDTH)*4+offs])
+                            + (uint8_t)(blur_rate*channel_rates[offs]*(float)framebuffer[((i)*SCREEN_WIDTH+(j-1)%SCREEN_WIDTH)*4+offs])
+                        );
+                    }
+                }
+            }
+        }
+
+    }
+
+    if (game_state.input_mode == TOUCH) {
+        if (game_state.player.paddle_movement == PADDLE_LEFT) {
+            draw_ss(16, 16, BUTTON_INLAY, SCREEN_HEIGHT - BUTTON_HEIGHT - BUTTON_INLAY, BUTTON_WIDTH, BUTTON_HEIGHT, 0);
+        } else {
+            draw_ss(0, 16, BUTTON_INLAY, SCREEN_HEIGHT - BUTTON_HEIGHT - BUTTON_INLAY, BUTTON_WIDTH, BUTTON_HEIGHT, 0);
+        }
+
+        if (game_state.player.paddle_movement == PADDLE_RIGHT) {
+            draw_ss(16, 16, SCREEN_WIDTH - BUTTON_WIDTH - BUTTON_INLAY, SCREEN_HEIGHT - BUTTON_HEIGHT - BUTTON_INLAY, BUTTON_WIDTH, BUTTON_HEIGHT, DRAW_FLAGS_FLIP_X);
+        } else {
+            draw_ss(0, 16, SCREEN_WIDTH - BUTTON_WIDTH - BUTTON_INLAY, SCREEN_HEIGHT - BUTTON_HEIGHT - BUTTON_INLAY, BUTTON_WIDTH, BUTTON_HEIGHT, DRAW_FLAGS_FLIP_X);
+        }
+    }
+
     // draw paddle
-    draw_ss(0, 8, game_state.player.x, game_state.player.y, PADDLE_WIDTH, PADDLE_HEIGHT, 0);
+    // draw_ss(0, 8, game_state.player.x, game_state.player.y, PADDLE_WIDTH, PADDLE_HEIGHT, 0);
+    drawsprite(&paddle_sprite, game_state.player.x, game_state.player.y, 0, 0);
+
+    // draw blocks around the border
+    for(int16_t i = 0; i < SCREEN_WIDTH / 8; i++) {
+        drawsprite(&block_sprite, i * 8, 0, 0, 0);
+    }
+    for(int16_t j = 0; j < SCREEN_HEIGHT / 8; j++) {
+        drawsprite(&block_sprite, 0, j * 8, 0, 0);
+        drawsprite(&block_sprite, 120, j * 8, 0, 0);
+    }
+
+    // draw a ball
+    drawsprite(&ball_sprite, (int16_t)game_state.ball.x, (int16_t)game_state.ball.y, 0, 0);
+
+    drawsprite(&awsmc_sprite, 20, 80, 0, 0);
+
+
+
+
 
 }

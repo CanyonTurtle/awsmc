@@ -43,7 +43,7 @@ Now open `build/index.html`. You don't even have to "serve" the site - just open
 
 ## Publish your game
 
-Just publish your HTML file to your site and you've got a game!
+Your HTML file is now a game! You can host this file on your site, or even email the file to someone and they could just play it.
 
 [Acknowledgments here.](./acknowledgments.md)
 
