@@ -140,6 +140,7 @@ typedef struct {
     InputMode input_mode;
     Ball ball;
     uint32_t timer;
+    char blur_mode;
 } GameState;
 
 GameState game_state = {
@@ -157,6 +158,7 @@ GameState game_state = {
         .vy = 1.3,
     },
     .timer = 0,
+    .blur_mode = 0,
 };
 
 // This function is expected to be here in the .wasm.
@@ -251,6 +253,7 @@ void update(void) {
     if (game_state.ball.y < 8.0) {
         game_state.ball.y = 8.0;
         game_state.ball.vy *= (game_state.ball.vy < 0) ? -1.0 : 1.0;
+        game_state.blur_mode = !game_state.blur_mode;
     }
     const float BALL_BOTTOM_SIDE = ((float)SCREEN_HEIGHT) - 8.0 - 1.0;
     if (game_state.ball.y > BALL_BOTTOM_SIDE) {
@@ -272,7 +275,6 @@ void update(void) {
 
     // clear screen
     const uint32_t BG_COLOR = 0xf6ffd4ff;
-    // fill_screen(BG_COLOR);
 
     // draw rectangles
     #define BUTTON_INLAY 10
@@ -283,9 +285,9 @@ void update(void) {
 
 
     game_state.timer += 1;
-    float blur_rate = 0.1;
+    float blur_rate = 0.245;
     float channel_rates[4] = {1.0f, 1.00f, 1.0f, 1.0f};
-    if (game_state.timer % 1 == 0) {
+    if (game_state.blur_mode) {
         for (int kk = 0; kk < 2; kk++) {
             for (uint32_t i = 0; i < SCREEN_HEIGHT; i++) {
                 for (uint32_t j = 0; j < SCREEN_WIDTH; j++) {
@@ -301,7 +303,8 @@ void update(void) {
                 }
             }
         }
-
+    } else {
+        fill_screen(BG_COLOR);
     }
 
     if (game_state.input_mode == TOUCH) {
