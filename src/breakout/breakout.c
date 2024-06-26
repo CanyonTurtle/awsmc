@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
+#include <stdio.h>
 
 #include "awsmc.h"
 
@@ -158,7 +159,7 @@ GameState game_state = {
         .vy = 1.3,
     },
     .timer = 0,
-    .blur_mode = 0,
+    .blur_mode = 1,
 };
 
 // This function is expected to be here in the .wasm.
@@ -253,7 +254,6 @@ void update(void) {
     if (game_state.ball.y < 8.0) {
         game_state.ball.y = 8.0;
         game_state.ball.vy *= (game_state.ball.vy < 0) ? -1.0 : 1.0;
-        game_state.blur_mode = !game_state.blur_mode;
     }
     const float BALL_BOTTOM_SIDE = ((float)SCREEN_HEIGHT) - 8.0 - 1.0;
     if (game_state.ball.y > BALL_BOTTOM_SIDE) {
@@ -285,9 +285,9 @@ void update(void) {
 
 
     game_state.timer += 1;
-    float blur_rate = 0.245;
-    float channel_rates[4] = {1.0f, 1.00f, 1.0f, 1.0f};
-    if (game_state.blur_mode) {
+    float blur_rate = 0.25;
+    float channel_rates[4] = {-0.1f, -.1f, -0.1f, 0.95f};
+    if (game_state.blur_mode && game_state.timer % 1 == 0) {
         for (int kk = 0; kk < 2; kk++) {
             for (uint32_t i = 0; i < SCREEN_HEIGHT; i++) {
                 for (uint32_t j = 0; j < SCREEN_WIDTH; j++) {
@@ -304,7 +304,7 @@ void update(void) {
             }
         }
     } else {
-        fill_screen(BG_COLOR);
+        // fill_screen(BG_COLOR);
     }
 
     if (game_state.input_mode == TOUCH) {
@@ -331,15 +331,17 @@ void update(void) {
     }
     for(int16_t j = 0; j < SCREEN_HEIGHT / 8; j++) {
         drawsprite(&block_sprite, 0, j * 8, 0, 0);
-        drawsprite(&block_sprite, 120, j * 8, 0, 0);
+        drawsprite(&block_sprite, SCREEN_WIDTH - 8, j * 8, 0, 0);
     }
 
     // draw a ball
     drawsprite(&ball_sprite, (int16_t)game_state.ball.x, (int16_t)game_state.ball.y, 0, 0);
 
-    drawsprite(&awsmc_sprite, 20, 80, 0, 0);
+    drawsprite(&awsmc_sprite, SCREEN_WIDTH / 2 - awsmc_frames[0].w / 2, 80, 0, 0);
 
-
+    char debug_msg[200];
+    sprintf(debug_msg, "is_mobile is %x, netplay client number is %x, keys offset is %X", awsm_info.is_mobile, awsm_info.netplay_client_number, (uint8_t*)&(awsm_info.inputs[0].keys) - (uint8_t*)&(awsm_info.inputs[0].touches));
+    // trace((uint8_t*) debug_msg);
 
 
 

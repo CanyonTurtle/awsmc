@@ -22,8 +22,10 @@ uint8_t framebuffer[SCREEN_WIDTH*SCREEN_HEIGHT*FRAMEBUFFER_BYPP];
 // You can decide if and where the spritesheet should be.
 uint8_t spritesheet[SPRITESHEET_WIDTH*SPRITESHEET_HEIGHT*FRAMEBUFFER_BYPP];
 
-#define TOUCH_BUFFER_SIZE 10
-Touch touch_buffer[TOUCH_BUFFER_SIZE];
+
+float backing_framebuffer[SCREEN_HEIGHT * SCREEN_WIDTH * FRAMEBUFFER_BYPP];
+
+AwsmInfo awsm_info;
 
 typedef struct {
     uint32_t timer;
@@ -66,7 +68,7 @@ AwsmConfig* configure(void) {
 
     AwsmConfig config = {
         .framebuffer_addr= (uint32_t*)&framebuffer,
-        .info_addr = (uint32_t*)&touch_buffer,
+        .info_addr = (uint32_t*)&awsm_info,
         .spritesheet_addr = (uint32_t*)&spritesheet,
         .logical_width_px = SCREEN_WIDTH,
         .logical_height_px = SCREEN_HEIGHT,
@@ -83,7 +85,7 @@ void update(void) {
     game_state.timer += 1;
     // Your game logic here
     // For now, let's just fill the screen buffer with random colors
-    float add_mult = 0.5f;
+    float add_mult = 0.3f;
 
     char triggered = 0;
     int16_t xx = 0;
@@ -96,7 +98,7 @@ void update(void) {
     // Access touch data from the buffer
     char any = 0;
     for (int i = 0; i < TOUCH_BUFFER_SIZE; i++) {
-        Touch touch = touch_buffer[i];
+        Touch touch = awsm_info.inputs[0].touches[i];
         uint16_t x = touch.x;
         uint16_t y = touch.y;
         uint16_t generation = touch.generation;
@@ -104,7 +106,7 @@ void update(void) {
         // Use touch data as needed
         if (x != 0 && y != 0 && generation) {
             any = 1;
-            
+            trace("touched");
             
             for(int j = 0; j < 4; j++) {
                 rc[j] = framebuffer[(y*SCREEN_WIDTH+x)*4+j]; 
@@ -133,11 +135,12 @@ void update(void) {
 
     if(triggered) {
         for (uint32_t i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) {
-            framebuffer[i * 4] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i*2, 1.2) + game_state.timer/2) % 200) + 30);        // R
-            framebuffer[i * 4 + 1] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i*3, 1.01) + game_state.timer/14) % 256));  // G
-            framebuffer[i * 4 + 2] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i*5, 0.99)/10 + game_state.timer) % 220)); // B
-            framebuffer[i * 4 + 3] += (uint8_t)(add_mult * (float)(((uint32_t)pow(i, 1.1) + (uint32_t)pow(game_state.timer, 0.9))%190) + 10);    // A
+            backing_framebuffer[i * 4] += (float)(add_mult * (float)(((uint32_t)pow(i*2, 1.2) + game_state.timer/2) % 200) + 30);        // R
+            backing_framebuffer[i * 4 + 1] += (float)(add_mult * (float)(((uint32_t)pow(i*3, 1.01) - 60 * (uint32_t)backing_framebuffer[i * 4] + game_state.timer/14) % 256));  // G
+            backing_framebuffer[i * 4 + 2] += (float)(add_mult * (float)(((uint32_t)pow(i*5, 0.99)/10 + 60 * (uint32_t)backing_framebuffer[i * 4 + 1] + game_state.timer) % 220)); // B
+            backing_framebuffer[i * 4 + 3] += (float)(add_mult * (float)((uint32_t)(pow(i, 1.1) + pow(game_state.timer, 0.9))%190) + 10);    // A
         }
+        
         uint32_t c = (
             ((rc[0] << 24) & 0xff000000) |
             ((rc[1] << 16) & 0xff0000) |
@@ -147,24 +150,27 @@ void update(void) {
         fill(xx, yy,BUTTON_SIZE,BUTTON_SIZE, c);
     }
 
-    float blur_rate = 0.2535;
+    float blur_rate = 0.02f;
     float channel_rates[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-    if (1) {
+    if (game_state.timer % 1 == 0) {
         for (uint32_t i = 0; i < SCREEN_HEIGHT; i++) {
             for (uint32_t j = 0; j < SCREEN_WIDTH; j++) {
                 for (uint32_t offs = 0; offs < 4; offs++) {
-                    framebuffer[(i*SCREEN_WIDTH+j)*4+offs] = (
-                        (uint8_t)((1.0f - 4.0f*blur_rate*channel_rates[offs])*(float)framebuffer[(i*SCREEN_WIDTH+j)*4+offs])
-                        + (uint8_t)(blur_rate*channel_rates[offs]*(float)framebuffer[(((i-1)%SCREEN_HEIGHT)*SCREEN_WIDTH+j)*4+offs])
-                        + (uint8_t)(blur_rate*channel_rates[offs]*(float)framebuffer[(((i+1)%SCREEN_HEIGHT)*SCREEN_WIDTH+j)*4+offs])
-                        + (uint8_t)(blur_rate*channel_rates[offs]*(float)framebuffer[((i)*SCREEN_WIDTH+(j+1)%SCREEN_WIDTH)*4+offs])
-                        + (uint8_t)(blur_rate*channel_rates[offs]*(float)framebuffer[((i)*SCREEN_WIDTH+(j-1)%SCREEN_WIDTH)*4+offs])
+                    backing_framebuffer[(i*SCREEN_WIDTH+j)*4+offs] = (
+                        (float)((1.0f - 4.0f*blur_rate*channel_rates[offs])*(float)backing_framebuffer[(i*SCREEN_WIDTH+j)*4+offs])
+                        + (float)(blur_rate*channel_rates[offs]*(float)backing_framebuffer[(((i-1)%SCREEN_HEIGHT)*SCREEN_WIDTH+j)*4+offs])
+                        + (float)(blur_rate*channel_rates[offs]*(float)backing_framebuffer[(((i+1)%SCREEN_HEIGHT)*SCREEN_WIDTH+j)*4+offs])
+                        + (float)(blur_rate*channel_rates[offs]*(float)backing_framebuffer[((i)*SCREEN_WIDTH+(j+1)%SCREEN_WIDTH)*4+offs])
+                        + (float)(blur_rate*channel_rates[offs]*(float)backing_framebuffer[((i)*SCREEN_WIDTH+(j-1)%SCREEN_WIDTH)*4+offs])
                     );
                 }
             }
         }
     }
 
+    for(int i = 0; i < SCREEN_HEIGHT * SCREEN_WIDTH * FRAMEBUFFER_BYPP; i++) {
+        framebuffer[i] = (uint8_t) backing_framebuffer[i];
+    }
     
     blit((uint8_t*)&spritesheet, 0, 0, SPRITESHEET_WIDTH, (uint8_t*)&framebuffer, SCREEN_WIDTH / 2 - SPRITESHEET_WIDTH / 2, SCREEN_HEIGHT / 2 - SPRITESHEET_HEIGHT / 2, SCREEN_WIDTH, SPRITESHEET_WIDTH, SPRITESHEET_HEIGHT, 0);
 }

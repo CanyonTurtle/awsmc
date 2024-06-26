@@ -96,6 +96,9 @@ export type AwsmInfo = {
      */
     touch_generation: number,
 
+    /** u32 with value 0x1=not mobile, 0x2=mobile */
+    is_mobile: number,
+
     /**
      * The touches being pressed by the user. This will be loaded into the designated inputs buffer, TAKING INTO CONSIDERATION
      * which player # this client is (e.g. if player 2, these touches will be synced with the 2nd position in the input buffer).
@@ -135,8 +138,8 @@ export type AwsmConsole = {
         /** Section of console memory where screen pixel data lives. */
         framebuffer: Uint8Array | undefined,
 
-        /** Section of console memory where inputs live.  */
-        inputs: Uint8Array | undefined,
+        /** Section of console memory where inputs & other info lives.  */
+        info: Uint8Array | undefined,
 
         /** Section of memory where spritesheet lives. */
         spritesheet_buffer: Uint8Array | undefined,

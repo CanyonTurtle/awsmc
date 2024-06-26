@@ -1,7 +1,7 @@
-import {ALL_INPUTS_SIZE, CLIENT_INPUT_SIZE, FRAMEBUFFER_BYPP, KEYS_VALUES, TOUCHES_COUNT, TOUCH_STRUCT_SIZE, type AwsmConsole} from "./awsmc_console_types.ts"
+import { ALL_INPUTS_SIZE, CLIENT_INPUT_SIZE, FRAMEBUFFER_BYPP, KEYS_VALUES, TOUCHES_COUNT, TOUCH_STRUCT_SIZE, type AwsmConsole } from "./awsmc_console_types.ts"
 
 // import cart from "../build/cart.wasm"
-import {decode} from "./base64.ts"
+import { decode } from "./base64.ts"
 
 let gl: WebGL2RenderingContext;
 
@@ -33,9 +33,9 @@ var thisLoop: Date = new Date();
 
 
 
-export function toggleFullscreen () {
+export function toggleFullscreen() {
     if (document.fullscreenElement == null) {
-        function expandIframe () {
+        function expandIframe() {
             // Fullscreen failed, try to maximize our own iframe. We don't yet have a button to go
             // back to minimized, but this at least makes games on wasm4.org playable on iPhone
             const iframe = window.frameElement;
@@ -50,7 +50,7 @@ export function toggleFullscreen () {
             }
         }
 
-        const promise = document.body.requestFullscreen && document.body.requestFullscreen({navigationUI: "hide"});
+        const promise = document.body.requestFullscreen && document.body.requestFullscreen({ navigationUI: "hide" });
         if (promise) {
             promise.catch(expandIframe);
         } else {
@@ -61,14 +61,36 @@ export function toggleFullscreen () {
     }
 }
 
+const mobileAndTabletCheck = (): boolean => {
+    let check = false;
+    (function (a) { if (/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino|android|ipad|playbook|silk/i.test(a) || /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(a.substr(0, 4))) check = true; })(navigator.userAgent || navigator.vendor || window.opera);
+    return check;
+};
+
+const fill_uint_at_loc = (mode: "u8" | "u16" | "u32", arr: Uint8Array, idx_u8: number, value: number): void => {
+    let size = (mode === "u8") ? 1 : ((mode === "u16") ? 2 : 4);
+    for(let i = 0; i < size; i++) {
+        arr[idx_u8 + i] = (value >> (i * 8)) & 0xff;
+    }
+}
 
 
+function update_this_client_info(awsm_console: AwsmConsole) {
 
-
-function update_this_client_input(awsm_console: AwsmConsole) {
     let memory = awsm_console.memory;
-    awsm_console.buffers.inputs = new Uint8Array(memory!.buffer, awsm_console.config.info_addr + 12, ALL_INPUTS_SIZE);
-    const ips = awsm_console.buffers.inputs;
+    awsm_console.buffers.info = new Uint8Array(memory!.buffer, awsm_console.config.info_addr, ALL_INPUTS_SIZE + 14);
+
+    // update the information-type info.
+    fill_uint_at_loc("u32", awsm_console.buffers.info!, 0, awsm_console.info.device_width);
+    fill_uint_at_loc("u32", awsm_console.buffers.info!, 4, awsm_console.info.device_height);
+    fill_uint_at_loc("u16", awsm_console.buffers.info!, 8, awsm_console.info.netplay_client_number);
+    fill_uint_at_loc("u16", awsm_console.buffers.info!, 10, awsm_console.info.touch_generation);
+    fill_uint_at_loc("u16", awsm_console.buffers.info!, 12, awsm_console.info.is_mobile);
+
+
+    // update the touchscreen inputs.
+
+    const ips = new Uint8Array(awsm_console.memory!.buffer, awsm_console.config.info_addr + 0x16, ALL_INPUTS_SIZE);
     ips.fill(0);
 
     let idx = 0;
@@ -87,13 +109,12 @@ function update_this_client_input(awsm_console: AwsmConsole) {
         idx += 1;
     }
 
-    const keys_buffer = new Uint16Array(memory!.buffer, awsm_console.config.info_addr + 12 + CLIENT_INPUT_SIZE * awsm_console.info.netplay_client_number + TOUCHES_COUNT * TOUCH_STRUCT_SIZE, 2);
-    const ki = awsm_console.info.inputs[awsm_console.info.netplay_client_number].keys_input;
-    keys_buffer[1] = (ki >> 16) & 0xffff;
-    keys_buffer[0] = ki;
+    // update keyboard input for this client's player
+    fill_uint_at_loc("u32", awsm_console.buffers.info!, 16 + CLIENT_INPUT_SIZE * awsm_console.info.netplay_client_number + TOUCHES_COUNT * TOUCH_STRUCT_SIZE, awsm_console.info.inputs[awsm_console.info.netplay_client_number].keys_input);
+    // console.log(awsm_console.info.inputs[awsm_console.info.netplay_client_number].keys_input)
 
     awsm_console.info.touch_generation += 1;
-
+    // console.log(awsm_console.buffers.info);
 }
 
 /**
@@ -101,26 +122,26 @@ function update_this_client_input(awsm_console: AwsmConsole) {
  * @param {any} awsm_console
  */
 function bind_input_handlers(awsm_console: AwsmConsole) {
-    
+
     let mousedown = false;
     awsm_console._runtime_state.active_touches = new Map();
     awsm_console.info.touch_generation = 0;
 
     function handleTouchEvent(event: TouchEvent, removing: boolean) {
-        
+
         event.preventDefault();
-    
+
         const touches = event.changedTouches;
         for (let i = 0; i < touches.length; i++) {
             const touch = touches[i];
-            
+
             addTouch(touch.identifier, removing, touch.clientX, touch.clientY);
         }
     }
-    
+
     function handleMouseEvent(event: MouseEvent, removing: boolean) {
         event.preventDefault();
-    
+
         addTouch(-1, removing, event.clientX, event.clientY);
     }
 
@@ -132,39 +153,39 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
      * @param {any} y the client touch Y position.
      */
     function addTouch(id: number, removing: boolean, x: number, y: number) {
-        
+
         if (removing) {
             awsm_console._runtime_state.active_touches.delete(id);
             return;
-        }   
+        }
 
         const canvas = document.getElementById('screen') as HTMLCanvasElement;
         const rect = canvas.getBoundingClientRect();
-    
+
         // Calculate screen coordinates based on canvas size and client coordinates
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
-        
+
         const screenX = Math.floor((x - rect.left) * scaleX);
         const screenY = Math.floor((y - rect.top) * scaleY);
-    
+
         // If the touch events were oob, delete them.
         if (screenX < 0 || screenX >= canvas.width || screenY < 0 || screenY >= canvas.height) {
             awsm_console._runtime_state.active_touches.delete(id);
             return;
         }
-  
+
         // This will either update existing touches or add new ones, which will preserve the ordering.
         awsm_console._runtime_state.active_touches.set(id, [screenX, screenY, awsm_console.info.touch_generation])
 
     }
 
-    const touch_update = (e: TouchEvent) => {handleTouchEvent(e, false)}
-    const touch_delete = (e: TouchEvent) => {handleTouchEvent(e, true)}
+    const touch_update = (e: TouchEvent) => { handleTouchEvent(e, false) }
+    const touch_delete = (e: TouchEvent) => { handleTouchEvent(e, true) }
 
-    const handle_mousemove = (e: MouseEvent) => {if(mousedown) {handleMouseEvent(e, false);}};
-    const handle_mousedown = (e: MouseEvent) => {mousedown = true; handleMouseEvent(e, false);};
-    const handle_mouseup = (e: MouseEvent) => {mousedown = false; handleMouseEvent(e, true);};
+    const handle_mousemove = (e: MouseEvent) => { if (mousedown) { handleMouseEvent(e, false); } };
+    const handle_mousedown = (e: MouseEvent) => { mousedown = true; handleMouseEvent(e, false); };
+    const handle_mouseup = (e: MouseEvent) => { mousedown = false; handleMouseEvent(e, true); };
 
     const special_keymaps: Map<string, number> = new Map([
         ["Space", 30],
@@ -182,13 +203,13 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
         }
         if (e.code.startsWith("Key")) {
             const letter = e.code[3].toLowerCase();
-            key_idx = KEYS_VALUES.indexOf(letter); 
+            key_idx = KEYS_VALUES.indexOf(letter);
         } else if (special_keymaps.has(e.code)) {
             key_idx = special_keymaps.get(e.code)!;
         } else {
             return undefined;
         }
-        
+
         return key_idx;
     }
 
@@ -211,9 +232,9 @@ function bind_input_handlers(awsm_console: AwsmConsole) {
 
     const screen_el = document.getElementById("screen")!;
 
-    const rebind_listener = (listenee: HTMLElement, ltype: string, func: EventListener)  => {
+    const rebind_listener = (listenee: HTMLElement, ltype: string, func: EventListener) => {
         listenee.removeEventListener(ltype, func);
-        listenee.addEventListener(ltype, func, {passive: false});
+        listenee.addEventListener(ltype, func, { passive: false });
     };
 
     for (const [listenee, ltype, func] of [
@@ -266,10 +287,10 @@ export async function process_awsm_config(awsm_console: AwsmConsole, config_addr
         await ss_img.decode();
 
         // create a temporary canvas to render the image into bytes
-        
-        const ss_canvas = <HTMLCanvasElement> document.createElement("canvas")!;
+
+        const ss_canvas = <HTMLCanvasElement>document.createElement("canvas")!;
         const ss_ctx = ss_canvas.getContext("2d")!;
-        
+
         // Draw the image out, to rasterize it into RGBA bytes
         ss_canvas.width = ss_img.width;
         ss_canvas.height = ss_img.height;
@@ -280,7 +301,7 @@ export async function process_awsm_config(awsm_console: AwsmConsole, config_addr
         awsm_console.buffers.spritesheet_buffer = new Uint8Array(memory!.buffer, awsm_console.config.spritesheet_addr, ss_img.width * ss_img.height * FRAMEBUFFER_BYPP); // 4 bytes per pixel (RGBA)
         awsm_console.buffers.spritesheet_buffer.set(ss_bytes);
 
-        awsm_console._runtime_state.spritesheet_info = {width: ss_img.width, height: ss_img.height};
+        awsm_console._runtime_state.spritesheet_info = { width: ss_img.width, height: ss_img.height };
     }
 
 
@@ -357,7 +378,7 @@ export async function process_awsm_config(awsm_console: AwsmConsole, config_addr
 
 export function process_awsm_update(awsm_console: AwsmConsole) {
 
-    update_this_client_input(awsm_console);
+    update_this_client_info(awsm_console);
 
     // calculate fps timing
     thisLoop = new Date();
@@ -385,8 +406,8 @@ export async function init(): Promise<AwsmConsole> {
         var uint16array = new Uint16Array(arrayBuffer);
         uint8Array[0] = 0xAA; // set first byte
         uint8Array[1] = 0xBB; // set second byte
-        if(uint16array[0] === 0xBBAA) return true;
-        if(uint16array[0] === 0xAABB) return false;
+        if (uint16array[0] === 0xBBAA) return true;
+        if (uint16array[0] === 0xAABB) return false;
         else throw new Error("Something crazy just happened");
     }
 
@@ -395,7 +416,7 @@ export async function init(): Promise<AwsmConsole> {
         buffers: {
             config: undefined,
             framebuffer: undefined,
-            inputs: undefined,
+            info: undefined,
             spritesheet_buffer: undefined
         },
         config: {
@@ -416,7 +437,8 @@ export async function init(): Promise<AwsmConsole> {
                     keys_input: 0,
                 },
             ],
-            touch_generation: 0
+            touch_generation: 0,
+            is_mobile: mobileAndTabletCheck() ? 0x1 : 0x2,
         },
         exported_functions: {
             _configure: undefined,
@@ -443,7 +465,7 @@ export async function init(): Promise<AwsmConsole> {
         d_stride: number,
         w: number,
         h: number,
-        flags: number,  
+        flags: number,
     ) {
         // grab framebuffer. 
         // We try to reuse our buffer object 
@@ -463,24 +485,24 @@ export async function init(): Promise<AwsmConsole> {
         } else {
             src_buffer = new Uint8Array(awsm_console.memory!.buffer, src_addr);
         }
-        
-        
+
+
         const [startx, endx, stepx] = ((flags & 0x1) !== 0) ? [w, -1, -1] : [0, w, 1];
         const [starty, endy, stepy] = ((flags & 0x10) !== 0) ? [h, -1, -1] : [0, h, 1];
 
 
-        for (let i = 0; i < h; i++){
+        for (let i = 0; i < h; i++) {
             const di = ((flags & 0x10) === 0) ? i : h - 1 - i;
             for (let j = 0; j < w; j++) {
                 const dj = ((flags & 0x1) === 0) ? j : w - 1 - j;
-                let alpha: number = src_buffer[((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP+3];
+                let alpha: number = src_buffer[((sy + i) * s_stride + (sx + j)) * FRAMEBUFFER_BYPP + 3];
                 if (alpha !== 0) {
-                    const fb_loc = ((dy+di)*d_stride+(dx+dj))*FRAMEBUFFER_BYPP;
-                    const ss_loc = ((sy+i)*s_stride+(sx+j))*FRAMEBUFFER_BYPP;
+                    const fb_loc = ((dy + di) * d_stride + (dx + dj)) * FRAMEBUFFER_BYPP;
+                    const ss_loc = ((sy + i) * s_stride + (sx + j)) * FRAMEBUFFER_BYPP;
                     dest_buffer[fb_loc] = src_buffer[ss_loc];
-                    dest_buffer[fb_loc+1] = src_buffer[ss_loc+1];
-                    dest_buffer[fb_loc+2] = src_buffer[ss_loc+2];
-                    dest_buffer[fb_loc+3] = alpha;
+                    dest_buffer[fb_loc + 1] = src_buffer[ss_loc + 1];
+                    dest_buffer[fb_loc + 2] = src_buffer[ss_loc + 2];
+                    dest_buffer[fb_loc + 3] = alpha;
                 }
             }
         }
@@ -500,10 +522,10 @@ export async function init(): Promise<AwsmConsole> {
 
     function _REV(num: number): number {
         // Ensure the number is treated as a 32-bit unsigned integer
-        let result = ((num >>> 24) & 0xFF) | 
-                     ((num >>> 8) & 0xFF00) | 
-                     ((num << 8) & 0xFF0000) | 
-                     ((num << 24) & 0xFF000000);
+        let result = ((num >>> 24) & 0xFF) |
+            ((num >>> 8) & 0xFF00) |
+            ((num << 8) & 0xFF0000) |
+            ((num << 24) & 0xFF000000);
         return result >>> 0; // Convert to unsigned 32-bit integer
     }
 
@@ -528,7 +550,7 @@ export async function init(): Promise<AwsmConsole> {
                 awsm_console.buffers.framebuffer!.byteOffset
                 + (y * awsm_console.config.logical_width_px) * 4
                 + sx * 4
-            ), 
+            ),
             (ex - sx),
         ).fill(corrected_color);
     }
@@ -545,19 +567,37 @@ export async function init(): Promise<AwsmConsole> {
         }
     }
 
+    function getCString (ptr: number) {
+        let str = "";
+        for (;;) {
+            const c = new DataView(awsm_console.memory!.buffer).getUint8(ptr++);
+            if (c == 0) {
+                break;
+            }
+            str += String.fromCharCode(c);
+        }
+        return str;
+    }
+
+    function trace(ptr: number) {
+        const msg = getCString(ptr);
+        console.log(msg);
+    }
+
     // No need to set maximum memory; allow growth.
     // const memory = new WebAssembly.Memory({ initial: 1024, maximum: 1024});
     const imports = {
         env: {
             // memory,
             blit,
-            draw_ss, 
+            draw_ss,
             fill_screen,
             fill,
+            trace,
         },
     };
 
-    
+
 
     const cartdata_el = document.getElementById("cartdata")!;
     const encoded = cartdata_el.getAttribute("data-cart")!;
@@ -572,7 +612,7 @@ export async function init(): Promise<AwsmConsole> {
     awsm_console.memory = instance.exports.memory as WebAssembly.Memory;
     awsm_console.exported_functions._configure = instance.exports.configure as Function;
     awsm_console.exported_functions._update = instance.exports.update as Function;
-   
+
     return awsm_console;
 }
 
@@ -585,10 +625,10 @@ export default async function run() {
 
     const config_addr = awsm_console.exported_functions._configure!();
     await process_awsm_config(awsm_console, config_addr);
-    
+
     setInterval(() => {
-        awsm_console.exported_functions._update!();
         process_awsm_update(awsm_console);
+        awsm_console.exported_functions._update!();
     }, 1000 / 60);
     const canvas = document.getElementById('screen') as HTMLCanvasElement;
 
@@ -629,9 +669,9 @@ export default async function run() {
     window.addEventListener('resize', resizeCanvas);
 
     var fpsOut = document.getElementById('fpsOut')!;
-    setInterval(function(){
-        fpsOut.innerHTML = (1000/frameTime).toFixed(1) + " fps";
-    },1000);
+    setInterval(function () {
+        fpsOut.innerHTML = (1000 / frameTime).toFixed(1) + " fps";
+    }, 1000);
 }
 
 const canvas = document.getElementById("screen");
@@ -643,33 +683,38 @@ let recordedChunks;
 
 recordBtn.addEventListener("click", () => {
     recording = !recording;
-    if(recording){
-            recordBtn.textContent = "Stop";
-            const stream = canvas.captureStream(60);
-            mediaRecorder = new MediaRecorder(stream, {
-                mimeType: 'video/webm;codecs=vp9',
-                ignoreMutedMedia: true
+    if (recording) {
+        recordBtn.textContent = "Stop";
+        const stream = (canvas as HTMLCanvasElement).captureStream(60);
+
+        const kbps = 1024;
+        const Mbps = kbps * kbps;
+
+        const options = {
+        mimeType: "video/webm",
+        };
+
+        mediaRecorder = new MediaRecorder(stream, options);
+        recordedChunks = [];
+        mediaRecorder.ondataavailable = e => {
+            if (e.data.size > 0) {
+                recordedChunks.push(e.data);
+            }
+        };
+        mediaRecorder.start();
+    } else {
+        recordBtn.textContent = "Record"
+        mediaRecorder.stop();
+        setTimeout(() => {
+            const blob = new Blob(recordedChunks, {
+                type: "video/webm"
             });
-            recordedChunks = [];
-            mediaRecorder.ondataavailable = e => {
-                if(e.data.size > 0){
-                    recordedChunks.push(e.data);
-                }
-            };
-            mediaRecorder.start();
-        } else {
-            recordBtn.textContent = "Record"
-            mediaRecorder.stop();
-            setTimeout(() => {
-                const blob = new Blob(recordedChunks, {
-                    type: "video/webm"
-                });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "recording.webm";
-                a.click();
-                URL.revokeObjectURL(url);
-            },0);
-        }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "recording.webm";
+            a.click();
+            URL.revokeObjectURL(url);
+        }, 0);
+    }
 });

@@ -12,7 +12,7 @@
 #define TOUCH_BUFFER_SIZE 10
 
 /** The number of clients that can connect at once. */
-#define N_CLIENTS 10
+#define N_CLIENTS 4
 
 /** A single touch on the screen. */
 typedef struct {
@@ -33,6 +33,7 @@ typedef struct {
     uint32_t device_height;
     uint16_t netplay_client_number;
     uint16_t touch_generation;
+    uint32_t is_mobile;
     ClientInput inputs[N_CLIENTS];
 } AwsmInfo;
 
@@ -83,5 +84,8 @@ extern void fill_screen(uint32_t color);
 
 __attribute__((import_name("fill")))
 extern void fill(int16_t x, int16_t y, uint16_t w, uint16_t h, uint32_t color);
+
+__attribute__((import_name("trace")))
+extern void trace(uint8_t* ptr);
 
 #endif
